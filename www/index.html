@@ -1,0 +1,2219 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f172a">
+<title>Mi Control Empresarial</title>
+
+<!-- CREDENCIALES SUPABASE -->
+<script>
+const SUPABASE_URL = "https://bqekkocyvdplflunuhuo.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable__Th_yOuKA9sjc-vk0zmnLg_mj9x_Bas";
+</script>
+
+<script src="libs/tailwind.min.js" onload="tailwind.config={darkMode:'class'}" onerror="var s=document.createElement('script');s.src='https://tailwindcss.com';s.onload=function(){tailwind.config={darkMode:'class'}};document.head.appendChild(s)"></script>
+<script src="libs/chart.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js';document.head.appendChild(s)"></script>
+<script src="libs/datalabels.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2';document.head.appendChild(s)"></script>
+<script src="libs/xlsx.full.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';document.head.appendChild(s)"></script>
+<script src="libs/jspdf.umd.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';document.head.appendChild(s)"></script>
+<script src="libs/jspdf.plugin.autotable.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';document.head.appendChild(s)"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh}
+button{touch-action:manipulation}
+.hidden-screen{display:none!important}
+.surface{background:white;color:#1e293b}
+.dark body{background:#111827;color:#f9fafb}
+.dark .surface{background:#1f2937!important;color:#f9fafb!important}
+.dark .muted{color:#cbd5e1!important}
+.dark input,.dark select{background:#374151!important;color:white!important;border-color:#64748b!important}
+.dark table thead{background:#374151!important;color:white!important}
+.dark table tbody tr{border-color:#374151!important}
+.dark .area-card{background:#1f2937!important;color:white!important}
+.dark .area-card p{color:#cbd5e1!important}
+.area-card{transition:.15s}
+.area-card:active{transform:scale(.98)}
+canvas{max-width:100%}
+.area-card{position:relative;transition:.18s;border:1px solid transparent}
+.area-card:active{transform:scale(.985)}
+.area-card.selected-personal{border:2px solid #a78bfa;box-shadow:0 0 0 3px #8b5cf633}
+.area-card.selected-business{border:2px solid #38bdf8;box-shadow:0 0 0 3px #0ea5e933}
+.area-icon{width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;flex:none}
+.area-icon svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.card-menu{position:absolute;right:10px;top:8px;z-index:5}
+.card-menu button{font-size:23px;line-height:1;padding:4px 9px;border-radius:9px}
+#selectedArea.personal-theme .area-heading{color:#a78bfa}
+#selectedArea.business-theme .area-heading{color:#38bdf8}
+#selectedArea.personal-theme .accent-button{background:#7c3aed!important}
+#selectedArea.business-theme .accent-button{background:#0f766e!important}
+
+</style>
+</head>
+
+<body class="bg-slate-100 text-slate-800">
+
+<!-- AUTENTICACIÓN -->
+<section id="loginScreen" class="min-h-screen flex items-center justify-center p-5">
+ <div class="surface w-full max-w-md rounded-3xl p-7 shadow-xl">
+  <div class="text-center mb-6">
+   <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-3xl text-white">🔐</div>
+   <h1 class="text-2xl font-bold">Mi Control Empresarial</h1>
+   <p class="muted mt-2 text-sm" id="authSubtitle">Inicia sesión o crea tu cuenta</p>
+  </div>
+
+  <form id="loginForm" class="space-y-4">
+   <div>
+    <label class="block text-sm font-semibold mb-1">Correo electrónico</label>
+    <input id="loginEmail" type="email" required autocomplete="username"
+     class="w-full rounded-xl border border-slate-300 p-3">
+   </div>
+   <div>
+    <label class="block text-sm font-semibold mb-1">Contraseña</label>
+    <input id="loginPassword" type="password" required minlength="6"
+     autocomplete="current-password"
+     class="w-full rounded-xl border border-slate-300 p-3">
+   </div>
+   <button id="loginButton" type="submit"
+    class="w-full rounded-xl bg-blue-600 p-3 font-bold text-white">Iniciar sesión</button>
+   <button id="registerButton" type="button"
+    class="w-full rounded-xl border-2 border-blue-600 p-3 font-semibold text-blue-700">
+    Crear cuenta nueva
+   </button>
+   <p id="loginStatus" class="text-sm text-center" role="status" aria-live="polite"></p>
+  </form>
+ </div>
+</section>
+
+<!-- APLICACIÓN -->
+<main id="appScreen" class="hidden-screen min-h-screen">
+
+<header class="bg-slate-900 text-white shadow-lg">
+ <div class="mx-auto max-w-7xl px-4 py-4 flex flex-wrap justify-between items-center gap-3">
+  <div>
+   <h1 class="text-xl sm:text-2xl font-bold">📊 Mi Control Empresarial</h1>
+   <p class="text-xs text-slate-300">Control financiero independiente</p>
+  </div>
+  <div class="flex gap-2 items-center">
+   <select id="languageSelect" class="rounded-lg bg-slate-800 border border-slate-600 p-2 text-sm text-white">
+    <option value="es">🇪🇸 Español</option>
+    <option value="en">🇬🇧 English</option>
+   </select>
+   <button id="themeButton" class="rounded-lg bg-slate-700 px-3 py-2">🌙</button>
+   <button id="logoutButton" class="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold">Salir</button>
+  </div>
+ </div>
+</header>
+
+<div class="mx-auto max-w-7xl p-4 sm:p-6 space-y-7">
+
+  <!-- PORTADA PRINCIPAL (2 ÁREAS) -->
+ <section id="homeHub">
+ <h2 class="text-xl font-bold mb-4">Selecciona un área de trabajo</h2>
+ <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+ <button id="openPersonalHubBtn" type="button" class="area-card surface rounded-2xl p-6 text-left shadow border-2 border-transparent hover:border-purple-400">
+ <div class="flex items-center gap-4">
+ <div class="area-icon" style="color:#7c3aed;background:#7c3aed18">
+ <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+ </div>
+ <div>
+ <h3 class="font-bold text-xl">👤 Área Personal</h3>
+ <p class="muted text-sm mt-1">Control de ingresos, gastos, límites y gastos hormiga</p>
+ </div>
+ </div>
+ <p class="font-bold text-sm mt-5 text-purple-600">Entrar al área personal →</p>
+ </button>
+
+ <button id="openBusinessHubBtn" type="button" class="area-card surface rounded-2xl p-6 text-left shadow border-2 border-transparent hover:border-sky-400">
+ <div class="flex items-center gap-4">
+ <div class="area-icon" style="color:#0284c7;background:#0284c718">
+ <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18l-2-7H5zM5 10v11h14V10M9 21v-7h6v7"/></svg>
+ </div>
+ <div>
+ <h3 class="font-bold text-xl">💼 Mis Negocios</h3>
+ <p class="muted text-sm mt-1">Gestión empresarial: ventas, inventario, caja, producción y más</p>
+ </div>
+ </div>
+ <p class="font-bold text-sm mt-5 text-sky-600">Entrar a mis negocios →</p>
+ </button>
+ </div>
+ <div id="personalGrid" class="hidden-screen"></div>
+ </section>
+
+ <!-- LISTA DE NEGOCIOS -->
+ <section id="businessHub" class="hidden-screen space-y-4">
+ <div class="flex flex-wrap justify-between items-center gap-3">
+ <div class="flex items-center gap-3">
+ <button id="backFromBusinessHubBtn" type="button" class="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-800">← Inicio</button>
+ <h2 class="text-xl font-bold">💼 Mis Negocios</h2>
+ </div>
+ <button id="addBusinessButton" class="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">
+ ➕ Agregar Nuevo Negocio
+ </button>
+ </div>
+ <div id="businessGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+ </section>
+
+ <!-- PANEL EMPRESARIAL (9 CONTROLES) -->
+ <section id="enterpriseArea" class="hidden-screen space-y-6">
+ <div class="surface rounded-2xl p-5 shadow flex flex-wrap justify-between items-center gap-3">
+ <div>
+ <p class="muted text-xs uppercase tracking-wide text-sky-600 font-bold">Zona Empresarial</p>
+ <h2 id="entBusinessTitle" class="text-2xl font-bold">—</h2>
+ <p id="entBusinessType" class="muted text-sm"></p>
+ </div>
+ <button id="backFromEnterpriseBtn" type="button" class="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-800">
+ ← Volver a negocios
+ </button>
+ </div>
+
+ <!-- CUADRÍCULA DE LOS 9 CONTROLES -->
+ <div id="entModulesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+ <!-- ÁREA DE TRABAJO DEL CONTROL ACTIVO -->
+ <div id="entModuleWorkspace" class="hidden-screen space-y-5">
+ <div class="surface rounded-2xl p-5 shadow flex flex-wrap justify-between items-center gap-3 border-l-4 border-sky-500">
+ <div>
+ <h3 id="entModuleTitle" class="text-xl font-bold">—</h3>
+ <p id="entModuleDesc" class="muted text-sm"></p>
+ </div>
+ <button id="closeEntModuleBtn" type="button" class="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800">
+ ✕ Cerrar módulo
+ </button>
+ </div>
+
+ <!-- RESUMEN AUTOMÁTICO (PARA FLUJO DE CAJA / RENTABILIDAD / TOTALES) -->
+ <div id="entSummaryCards" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+
+ <!-- FORMULARIO DINÁMICO DEL MÓDULO -->
+ <section id="entFormSection" class="surface rounded-2xl p-5 shadow">
+ <h4 id="entFormHeading" class="font-bold text-lg mb-4">Registrar dato</h4>
+ <form id="entRecordForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+ <div id="entFieldTitleWrap">
+ <label id="entLabelTitle" class="block text-sm font-semibold mb-1">Concepto / Producto</label>
+ <input id="entInputTitle" required maxlength="150" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div id="entFieldPartyWrap">
+ <label id="entLabelParty" class="block text-sm font-semibold mb-1">Cliente / Proveedor / Personal</label>
+ <input id="entInputParty" maxlength="120" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div id="entFieldCategoryWrap">
+ <label id="entLabelCategory" class="block text-sm font-semibold mb-1">Categoría / Cargo / Lote</label>
+ <input id="entInputCategory" maxlength="80" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div id="entFieldQtyWrap">
+ <label id="entLabelQty" class="block text-sm font-semibold mb-1">Cantidad</label>
+ <input id="entInputQty" type="number" step="0.01" min="0" value="1" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div id="entFieldUnitWrap">
+ <label id="entLabelUnit" class="block text-sm font-semibold mb-1">Unidad</label>
+ <input id="entInputUnit" placeholder="Ej. und, kg, hrs" maxlength="30" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div id="entFieldAmountWrap">
+ <label id="entLabelAmount" class="block text-sm font-semibold mb-1">Monto Total</label>
+ <input id="entInputAmount" type="number" step="0.01" min="0" required placeholder="0.00" class="w-full rounded-xl border border-slate-300 p-3">
+ </div>
+ <div>
+ <label class="block text-sm font-semibold mb-1">Moneda</label>
+ <select id="entInputCurrency" class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 appearance-none">
+ <option>USD</option><option>CLP</option><option>VES</option>
+ <option>EUR</option><option>COP</option><option>BRL</option><option>CNY</option>
+ </select>
+ </div>
+ <div>
+ <label id="entLabelDate" class="block text-sm font-semibold mb-1">Fecha</label>
+ <input id="entInputDate" type="date" required class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 appearance-none">
+ </div>
+ <div id="entFieldStatusWrap">
+ <label class="block text-sm font-semibold mb-1">Estado</label>
+ <select id="entInputStatus" class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 appearance-none">
+ <option value="completed">Completado / Pagado</option>
+ <option value="pending">Pendiente</option>
+ </select>
+ </div>
+ <div class="sm:col-span-2 lg:col-span-3">
+ <button id="entSaveBtn" type="submit" class="w-full rounded-xl bg-sky-600 p-3 font-bold text-white">
+ Guardar registro
+ </button>
+ <p id="entFormStatus" class="mt-2 text-sm"></p>
+ </div>
+ </form>
+ </section>
+
+ <!-- TABLA DE REGISTROS DEL MÓDULO -->
+ <section class="surface rounded-2xl p-5 shadow">
+ <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+ <h4 class="font-bold text-lg">📋 Registros del módulo</h4>
+ <div class="flex gap-2">
+ <button id="entExportExcelBtn" type="button" class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-sm font-semibold">📊 Excel</button>
+ <button id="entExportPdfBtn" type="button" class="rounded-lg bg-rose-600 text-white px-3 py-2 text-sm font-semibold">📄 PDF</button>
+ </div>
+ </div>
+ <div class="overflow-x-auto">
+ <table class="w-full min-w-[680px] text-sm text-left">
+ <thead class="bg-slate-100 text-slate-600">
+ <tr>
+ <th class="p-3">Fecha</th>
+ <th class="p-3">Concepto / Producto</th>
+ <th class="p-3">Detalle / Tercero</th>
+ <th class="p-3 text-right">Cant.</th>
+ <th class="p-3 text-right">Monto</th>
+ <th class="p-3">Estado</th>
+ <th class="p-3">Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="entRecordsTable"></tbody>
+ </table>
+ </div>
+ </section>
+ </div>
+ </section>
+
+
+ <!-- CREAR NEGOCIO -->
+ <section id="businessModal" class="hidden-screen surface rounded-2xl p-5 shadow">
+  <h3 class="text-lg font-bold mb-4">Crear nuevo negocio</h3>
+  <form id="businessForm" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   <div>
+    <label class="block text-sm font-semibold mb-1">Nombre del negocio</label>
+    <input id="businessName" maxlength="80" required
+     placeholder="Ej. Mi barbería"
+     class="w-full rounded-xl border border-slate-300 p-3">
+   </div>
+   <div>
+    <label class="block text-sm font-semibold mb-1">Tipo de negocio</label>
+    <select id="businessType" class="w-full rounded-xl border border-slate-300 p-3">
+     <option>Barbería</option>
+     <option>Peluquería</option>
+     <option>Minimarket</option>
+     <option>Frutería</option>
+     <option>Restaurante</option>
+     <option>Comercio</option>
+     <option>Agricultura</option>
+     <option>Ganadería</option>
+     <option>Negocio de comida</option>
+     <option>Otro</option>
+    </select>
+   </div>
+   <div class="sm:col-span-2 flex gap-2">
+    <button type="submit" id="createBusinessButton"
+     class="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">Crear negocio</button>
+    <button type="button" id="cancelBusinessButton"
+     class="rounded-xl bg-slate-200 px-5 py-3 font-semibold text-slate-800">Cancelar</button>
+   </div>
+  </form>
+  <p id="businessStatus" class="mt-3 text-sm" role="status"></p>
+ </section>
+
+ <!-- ÁREA SELECCIONADA -->
+ <section id="selectedArea" class="hidden-screen space-y-6">
+
+  <div class="surface rounded-2xl p-5 shadow flex flex-wrap justify-between items-center gap-3">
+   <div>
+    <p class="muted text-xs uppercase tracking-wide">Área seleccionada</p>
+    <h2 id="selectedTitle" class="text-2xl font-bold">—</h2>
+    <p id="selectedType" class="muted text-sm"></p>
+   </div>
+   <button id="backButton" class="rounded-xl bg-slate-200 px-4 py-2 font-semibold text-slate-800">
+    ← Volver a áreas
+   </button>
+  </div>
+
+  <!-- LÍMITE DE GASTOS -->
+  <section class="surface rounded-2xl p-5 shadow">
+   <h3 class="font-bold text-lg mb-3">🎯 Límite de gasto máximo</h3>
+   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+    <div>
+     <label class="block text-sm font-semibold mb-1">Límite de gastos</label>
+     <input id="expenseLimit" type="number" min="0" step="0.01"
+      placeholder="Ej. 500"
+      class="w-full rounded-xl border border-slate-300 p-3">
+    </div>
+    <div>
+     <label class="block text-sm font-semibold mb-1">Moneda del límite</label>
+     <select id="limitCurrency" class="w-full rounded-xl border border-slate-300 p-3">
+      <option>USD</option><option>CLP</option><option>VES</option>
+      <option>EUR</option><option>COP</option><option>BRL</option><option>CNY</option>
+     </select>
+    </div>
+    <button id="saveLimitButton" class="rounded-xl bg-blue-600 p-3 font-bold text-white">
+     Guardar límite
+    </button>
+   </div>
+   <p id="limitStatus" class="mt-3 text-sm" role="status"></p>
+   <div class="mt-4">
+    <div class="flex justify-between text-sm mb-1">
+     <span id="limitProgressLabel">Gastos acumulados</span>
+     <strong id="limitPercentage">—</strong>
+    </div>
+    <div class="h-4 overflow-hidden rounded-full bg-slate-200">
+     <div id="limitProgress" class="h-full rounded-full bg-emerald-500 transition-all"
+      style="width:0%"></div>
+    </div>
+    <p id="limitAlert" class="mt-3 text-sm font-semibold" role="alert"></p>
+   </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <section>
+   <h3 class="text-xl font-bold mb-3">Resumen financiero</h3>
+   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="rounded-2xl bg-emerald-600 p-5 text-white shadow">
+     <p class="text-sm">Ingresos</p>
+     <div id="incomeSummary" class="mt-3 text-xl font-bold">—</div>
+    </div>
+    <div class="rounded-2xl bg-blue-700 p-5 text-white shadow">
+     <p class="text-sm">Balance neto</p>
+     <div id="balanceSummary" class="mt-3 text-xl font-bold">—</div>
+    </div>
+    <div class="rounded-2xl bg-rose-600 p-5 text-white shadow">
+     <p class="text-sm">Gastos</p>
+     <div id="expenseSummary" class="mt-3 text-xl font-bold">—</div>
+    </div>
+   </div>
+  </section>
+
+  <!-- GRÁFICA -->
+  <section class="surface rounded-2xl p-5 shadow">
+   <h3 class="font-bold text-lg mb-4">📊 Distribución financiera del área</h3>
+   <div class="mx-auto max-w-xl">
+    <canvas id="balanceChart"></canvas>
+   </div>
+   <p id="chartNote" class="muted text-center text-xs mt-3"></p>
+  </section>
+
+  <!-- REGISTRO -->
+  <section class="surface rounded-2xl p-5 shadow">
+   <h3 class="font-bold text-lg mb-4">Registrar movimiento</h3>
+   <form id="transactionForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+    <div>
+     <label class="block text-sm font-semibold mb-1">Tipo</label>
+     <select id="transactionType" class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 appearance-none">
+      <option value="income">Ingreso</option>
+      <option value="expense">Gasto</option>
+     </select>
+    </div>
+    <div>
+     <label class="block text-sm font-semibold mb-1">Fecha</label>
+     <input id="transactionDate" type="date" required
+      class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 appearance-none">
+    </div>
+    <div>
+     <label class="block text-sm font-semibold mb-1">Moneda</label>
+     <select id="transactionCurrency" class="w-full rounded-xl border border-slate-300 px-3 h-12 m-0 apparance-none">
+      <option>USD</option><option>CLP</option><option>VES</option>
+      <option>EUR</option><option>COP</option><option>BRL</option><option>CNY</option>
+     </select>
+    </div>
+    <div class="sm:col-span-2">
+     <label class="block text-sm font-semibold mb-1">Descripción</label>
+     <input id="transactionDescription" maxlength="200" required
+      placeholder="Ej. Compra de alimentos"
+      class="w-full rounded-xl border border-slate-300 p-3">
+    </div>
+    <div>
+     <label class="block text-sm font-semibold mb-1">Monto</label>
+     <input id="transactionAmount" type="number" min="0.01" step="0.01"
+      required placeholder="0.00"
+      class="w-full rounded-xl border border-slate-300 p-3">
+    </div>
+    <div class="sm:col-span-2 lg:col-span-3">
+     <button id="saveTransactionButton" type="submit"
+      class="w-full rounded-xl bg-blue-600 p-3 font-bold text-white">
+      Guardar movimiento
+     </button>
+     <p id="formStatus" class="mt-3 text-sm" role="status"></p>
+    </div>
+   </form>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="surface rounded-2xl p-5 shadow">
+   <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+    <h3 class="font-bold text-lg">📚 Historial de movimientos</h3>
+  <div class="flex gap-2 flex-wrap items-center">
+     <button id="allHistoryTab" class="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm">Todos</button>
+     <button id="antHistoryTab" class="hidden-screen rounded-lg bg-slate-200 px-3 py-2 text-sm text-slate-800">🐜 Gastos Hormiga</button>
+
+     <select id="monthFilter" aria-label="Filtrar por mes"
+      class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800">
+      <option value="all">Todos los meses</option>
+     </select>
+
+     <button id="exportExcelButton" type="button"
+      class="rounded-lg bg-emerald-600 text-white px-3 py-2 text-sm font-semibold">
+      📊 Exportar Excel
+     </button>
+
+     <button id="exportPdfButton" type="button"
+      class="rounded-lg bg-red-600 text-white px-3 py-2 text-sm font-semibold">
+      📄 Exportar PDF
+     </button>
+    </div>
+   </div>
+   <div id="antSummary" class="hidden-screen mb-4 rounded-xl bg-amber-100 p-4 text-amber-900">
+    <p class="font-bold">🐜 Total de gastos hormiga</p>
+    <div id="antTotal" class="text-xl font-bold mt-1">—</div>
+    <p class="text-xs mt-1">Suma de los microgastos identificados en el área personal.</p>
+   </div>
+   <div class="overflow-x-auto">
+    <table class="w-full min-w-[680px] text-sm text-left">
+     <thead class="bg-slate-100 text-slate-600">
+      <tr>
+       <th class="p-3">Fecha y hora</th>
+       <th class="p-3">Descripción</th>
+       <th class="p-3">Tipo</th>
+       <th class="p-3">Moneda</th>
+       <th class="p-3 text-right">Monto</th>
+       <th class="p-3">Etiqueta</th>
+       <th class="p-3">Acciones</th>
+      </tr>
+     </thead>
+     <tbody id="transactionsTable"></tbody>
+    </table>
+   </div>
+   <p id="historyStatus" class="muted mt-3 text-sm"></p>
+  </section>
+ </section>
+
+ <p id="globalStatus" class="muted text-sm" role="status"></p>
+ <footer class="muted text-center text-xs pb-5">Mi Control Empresarial · Supabase</footer>
+</div>
+</main>
+
+<script>
+"use strict";
+
+if(window.ChartDataLabels)Chart.register(ChartDataLabels);
+
+/* CONFIGURACIÓN */
+const URL = SUPABASE_URL.trim().replace(/\/+$/,"");
+const KEY = SUPABASE_PUBLISHABLE_KEY.trim();
+
+const STORAGE = {
+ access:"mce_access_token",
+ refresh:"mce_refresh_token",
+ user:"mce_user",
+ language:"mce_language",
+ theme:"mce_theme"
+};
+
+const storage = {
+ get(k){try{return localStorage.getItem(k)}catch(e){return null}},
+ set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},
+ remove(k){try{localStorage.removeItem(k)}catch(e){}}
+};
+
+const $ = id => document.getElementById(id);
+
+const state = {
+ url:URL,
+ key:KEY,
+ accessToken:"",
+ refreshToken:"",
+ user:null,
+ accounts:[],
+ transactions:[],
+ selectedAccount:null,
+ historyMode:"all",
+ chart:null,
+ language:storage.get(STORAGE.language)||"es",
+ theme:storage.get(STORAGE.theme)||"auto"
+};
+
+function validateConfig(){
+ if(!/^https:\/\/[a-zA-Z0-9-]+\.supabase\.co$/.test(state.url))
+  throw new Error("Revisa SUPABASE_URL.");
+ if(!state.key.startsWith("sb_publishable_"))
+  throw new Error("Revisa SUPABASE_PUBLISHABLE_KEY.");
+}
+
+function status(id,message,error=false){
+ const el=$(id);
+ if(!el)return;
+ el.textContent=message;
+ el.className="mt-3 text-sm "+(error?"text-red-600":"text-emerald-600");
+}
+
+function currentUserId(){
+ return state.user?.id || null;
+}
+
+/* IDIOMA */
+const labels={
+ es:{
+  login:"Iniciar sesión",register:"Crear cuenta nueva",
+  income:"Ingresos",expense:"Gastos",balance:"Balance neto",
+  save:"Guardar movimiento",loading:"Cargando datos...",
+  empty:"No hay movimientos para esta área.",
+  ant:"🐜 Gasto Hormiga",noLimit:"Sin límite configurado",
+  warning:"⚠️ Atención: has alcanzado el 85% de tu límite de gastos.",
+  exceeded:"⚠️ ¡Has alcanzado o superado tu límite de gastos configurado para esta área!",
+  saveError:"No se pudo guardar el movimiento.",
+  saved:"Movimiento guardado correctamente."
+ },
+ en:{
+  login:"Sign in",register:"Create account",
+  income:"Income",expense:"Expenses",balance:"Net balance",
+  save:"Save transaction",loading:"Loading data...",
+  empty:"No transactions for this area.",
+  ant:"🐜 Small expenses",noLimit:"No limit configured",
+  warning:"⚠️ Warning: you have reached 85% of your spending limit.",
+  exceeded:"⚠️ You have reached or exceeded the configured spending limit for this area!",
+  saveError:"Could not save the transaction.",
+  saved:"Transaction saved successfully."
+ }
+};
+
+function L(key){return labels[state.language]?.[key]||labels.es[key]||key;}
+
+function applyTheme(){
+ const dark=state.theme==="dark"||
+  (state.theme==="auto"&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+ document.documentElement.classList.toggle("dark",dark);
+ $("themeButton").textContent=state.theme==="auto"?"🌓":dark?"☀️":"🌙";
+ storage.set(STORAGE.theme,state.theme);
+}
+
+$("themeButton").addEventListener("click",()=>{
+ state.theme=state.theme==="auto"?"dark":state.theme==="dark"?"light":"auto";
+ applyTheme();
+ renderChart();
+});
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{
+ if(state.theme==="auto"){applyTheme();renderChart();}
+});
+
+$("languageSelect").addEventListener("change",e=>{
+ state.language=e.target.value;
+ storage.set(STORAGE.language,state.language);
+ renderSelectedArea();
+});
+
+/* SESIÓN */
+function loadSession(){
+ state.accessToken=storage.get(STORAGE.access)||"";
+ state.refreshToken=storage.get(STORAGE.refresh)||"";
+ try{state.user=JSON.parse(storage.get(STORAGE.user)||"null")}
+ catch{state.user=null}
+}
+
+function saveSession(data){
+ state.accessToken=data.access_token||"";
+ state.refreshToken=data.refresh_token||state.refreshToken;
+ state.user=data.user||state.user;
+ if(state.accessToken)storage.set(STORAGE.access,state.accessToken);
+ if(state.refreshToken)storage.set(STORAGE.refresh,state.refreshToken);
+ if(state.user)storage.set(STORAGE.user,JSON.stringify(state.user));
+}
+
+function clearSession(){
+ state.accessToken="";
+ state.refreshToken="";
+ state.user=null;
+ storage.remove(STORAGE.access);
+ storage.remove(STORAGE.refresh);
+ storage.remove(STORAGE.user);
+}
+
+async function refreshSession(){
+ if(!state.refreshToken)return false;
+ try{
+  const r=await fetch(state.url+"/auth/v1/token?grant_type=refresh_token",{
+   method:"POST",
+   headers:{apikey:state.key,"Content-Type":"application/json"},
+   body:JSON.stringify({refresh_token:state.refreshToken})
+  });
+  const data=await r.json();
+  if(!r.ok){clearSession();return false;}
+  saveSession(data);
+  return !!state.accessToken;
+ }catch(e){console.error(e);return false;}
+}
+
+async function api(path,options={},retry=true){
+ const {authenticated=true,...fetchOptions}=options;
+ const headers={
+  apikey:state.key,
+  "Content-Type":"application/json",
+  ...(authenticated&&state.accessToken?{Authorization:"Bearer "+state.accessToken}:{}),
+  ...(fetchOptions.headers||{})
+ };
+ const response=await fetch(state.url+path,{...fetchOptions,headers});
+
+ if(response.status===401&&retry&&authenticated&&state.refreshToken){
+  if(await refreshSession())return api(path,options,false);
+ }
+
+ const raw=await response.text();
+ let data=null;
+ try{data=raw?JSON.parse(raw):null}catch{data=raw;}
+ if(!response.ok){
+  throw new Error("HTTP "+response.status+": "+
+   (data?.message||data?.msg||data?.error_description||raw));
+ }
+ return data;
+}
+
+async function getCurrentUser(){
+ const user=await api("/auth/v1/user");
+ if(!user?.id)throw new Error("No se pudo identificar al usuario.");
+ state.user=user;
+ storage.set(STORAGE.user,JSON.stringify(user));
+ return user;
+}
+
+/* LOGIN */
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ $("loginButton").disabled=true;
+ $("registerButton").disabled=true;
+ status("loginStatus","Iniciando sesión...");
+
+ try{
+  validateConfig();
+  const r=await fetch(state.url+"/auth/v1/token?grant_type=password",{
+   method:"POST",
+   headers:{apikey:state.key,"Content-Type":"application/json"},
+   body:JSON.stringify({
+    email:$("loginEmail").value.trim(),
+    password:$("loginPassword").value
+   })
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.message||data.msg||"Error de inicio de sesión.");
+  saveSession(data);
+  $("loginPassword").value="";
+  await showApplication();
+ }catch(error){status("loginStatus",error.message,true);}
+ finally{$("loginButton").disabled=false;$("registerButton").disabled=false;}
+});
+
+/* REGISTRO */
+$("registerButton").addEventListener("click",async()=>{
+ const email=$("loginEmail").value.trim();
+ const password=$("loginPassword").value;
+ if(!email){status("loginStatus","Escribe tu correo electrónico.",true);return;}
+ if(password.length<6){status("loginStatus","La contraseña debe tener al menos 6 caracteres.",true);return;}
+
+ $("registerButton").disabled=true;
+ $("loginButton").disabled=true;
+ status("loginStatus","Creando cuenta...");
+
+ try{
+  validateConfig();
+  const r=await fetch(state.url+"/auth/v1/signup",{
+   method:"POST",
+   headers:{apikey:state.key,"Content-Type":"application/json"},
+   body:JSON.stringify({email,password})
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.message||data.msg||"No se pudo crear la cuenta.");
+
+  if(data.access_token&&data.user?.id){
+   saveSession(data);
+   $("loginPassword").value="";
+   await showApplication();
+  }else{
+   status("loginStatus","Cuenta creada. Revisa tu correo para confirmar la dirección.");
+  }
+ }catch(error){status("loginStatus",error.message,true);}
+ finally{$("registerButton").disabled=false;$("loginButton").disabled=false;}
+});
+
+/* CERRAR SESIÓN */
+$("logoutButton").addEventListener("click",async()=>{
+ try{
+  if(state.accessToken){
+   await fetch(state.url+"/auth/v1/logout",{
+    method:"POST",
+    headers:{apikey:state.key,Authorization:"Bearer "+state.accessToken}
+   });
+  }
+ }catch(e){console.warn(e);}
+ clearSession();
+ state.accounts=[];
+ state.transactions=[];
+ state.selectedAccount=null;
+ if(state.chart){state.chart.destroy();state.chart=null;}
+ $("appScreen").classList.add("hidden-screen");
+ $("loginScreen").classList.remove("hidden-screen");
+});
+
+/* CUENTAS */
+const initialAccounts=[
+ {name:"Personal",type:"personal"}
+];
+
+function inferType(account){
+ if(account.name==="Personal")return "personal";
+ return account.account_type==="personal"?"personal":"business";
+}
+
+async function ensureAccounts(){
+ const user=await getCurrentUser();
+ let rows=await api(
+  "/rest/v1/accounts?select=id,user_id,name,account_type,expense_limit,limit_currency&user_id=eq."+
+  encodeURIComponent(user.id)+"&order=created_at.asc"
+ );
+
+ const missing=initialAccounts.filter(def=>
+  !rows.some(a=>a.name.trim().toLowerCase()===def.name.toLowerCase())
+ );
+
+ if(missing.length){
+  await api("/rest/v1/accounts",{
+   method:"POST",
+   headers:{Prefer:"return=representation"},
+   body:JSON.stringify(missing.map(a=>({
+    user_id:user.id,
+    name:a.name,
+    account_type:a.type,
+    expense_limit:null
+   })))
+  });
+  rows=await api(
+   "/rest/v1/accounts?select=id,user_id,name,account_type,expense_limit,limit_currency&user_id=eq."+
+   encodeURIComponent(user.id)+"&order=created_at.asc"
+  );
+ }
+
+ state.accounts=rows.filter(a=>a.user_id===user.id);
+}
+
+/* CREAR NEGOCIO */
+$("addBusinessButton").addEventListener("click",()=>{
+ $("businessModal").classList.remove("hidden-screen");
+ $("businessName").focus();
+});
+
+$("cancelBusinessButton").addEventListener("click",()=>{
+ $("businessModal").classList.add("hidden-screen");
+});
+
+$("businessForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const button=$("createBusinessButton");
+ button.disabled=true;
+
+ try{
+  const user=await getCurrentUser();
+  const name=normalizeBusinessName($("businessName").value);
+  const type=$("businessType").value;
+
+  if(!name)throw new Error("Escribe un nombre para el negocio.");
+
+  if(state.accounts.some(a=>a.name.toLowerCase()===name.toLowerCase())){
+   throw new Error("Ya existe un área con ese nombre.");
+  }
+
+  const created=await api("/rest/v1/accounts",{
+   method:"POST",
+   headers:{Prefer:"return=representation"},
+   body:JSON.stringify([{
+    user_id:user.id,
+    name:name,
+    account_type:type.toLocaleLowerCase("es"),
+    expense_limit:null,
+limit_currency:"USD"
+   }])
+  });
+
+  if(!Array.isArray(created)||!created.length){
+   throw new Error("No se recibió la nueva cuenta desde Supabase.");
+  }
+
+  /* El tipo concreto se conserva como metadato local de presentación */
+  const types=getBusinessTypes();
+  types[created[0].id]=type;
+  storage.set("mce_business_types_"+user.id,JSON.stringify(types));
+
+  $("businessForm").reset();
+  $("businessModal").classList.add("hidden-screen");
+  status("businessStatus","Negocio creado correctamente.");
+  await loadAccountsAndDashboard();
+ }catch(error){status("businessStatus",error.message,true);}
+ finally{button.disabled=false;}
+});
+
+function getBusinessTypes(){
+ try{return JSON.parse(storage.get("mce_business_types_"+currentUserId())||"{}")}
+ catch{return {}}
+}
+
+function accountTypeLabel(account){
+ if(account.name==="Personal")return "Finanzas personales";
+ const types=getBusinessTypes();
+ return types[account.id]||account.account_type||"Negocio";
+}
+
+
+function normalizeBusinessName(value){
+ let name=String(value||"").trim().replace(/\s+/g," ").toLocaleLowerCase("es");
+ if(!name)return "";
+ name=name.replace(/\bbarberia\b/g,"barbería")
+          .replace(/\bpeluqueria\b/g,"peluquería")
+          .replace(/\bfruteria\b/g,"frutería")
+          .replace(/\bganaderia\b/g,"ganadería")
+          .replace(/\barea\b/g,"área");
+ return name.charAt(0).toLocaleUpperCase("es")+name.slice(1);
+}
+function accountTypeLabel(account){
+ if(account.name==="Personal")return "Finanzas personales";
+ const saved=getBusinessTypes()[account.id];
+ const raw=(account.account_type&&account.account_type!=="business")?account.account_type:(saved||"");
+ const key=String(raw||"").toLocaleLowerCase("es");
+ const labels={
+  finca:"Agricultura",granja:"Ganadería","negocio de comida":"Negocio de comida",
+  barberia:"Barbería",barbería:"Barbería",peluqueria:"Peluquería",peluquería:"Peluquería",
+  minimarket:"Minimarket",fruteria:"Frutería",frutería:"Frutería",
+  restaurante:"Restaurante",comercio:"Comercio",agricultura:"Agricultura",
+  ganaderia:"Ganadería",ganadería:"Ganadería",otro:"Otro"
+ };
+ return labels[key]||raw||"Negocio";
+}
+function accountIcon(account){
+ const name=String(account.name||"").toLocaleLowerCase("es");
+ const type=String(accountTypeLabel(account)||"").toLocaleLowerCase("es");
+ let id="store",color="#64748b",bg="#64748b18";
+ if(name==="personal"){id="user";color="#7c3aed";bg="#7c3aed18";}
+ else if(name.includes("finca")||type==="agricultura"){id="sprout";color="#166534";bg="#16653418";}
+ else if(name.includes("granja")||type==="ganadería"){id="barn";color="#854d0e";bg="#854d0e18";}
+ else if(name.includes("comida")){id="utensils";color="#ea580c";bg="#ea580c18";}
+ else if(type==="barbería"){id="scissors";color="#991b1b";bg="#991b1b18";}
+ else if(type==="peluquería"){id="dryer";color="#db2777";bg="#db277718";}
+ else if(type==="minimarket"){id="cart";color="#2563eb";bg="#2563eb18";}
+ else if(type==="frutería"){id="apple";color="#65a30d";bg="#65a30d18";}
+ else if(type==="restaurante"){id="utensils";color="#dc2626";bg="#dc262618";}
+ else if(type==="comercio"){id="store";color="#1e40af";bg="#1e40af18";}
+ else if(type==="agricultura"){id="sprout";color="#15803d";bg="#15803d18";}
+ const shapes={
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  sprout:'<path d="M12 22V12"/><path d="M12 14C5 14 3 9 3 4c6 0 9 3 9 8"/><path d="M12 11c0-5 3-8 9-8 0 5-2 10-9 10"/>',
+  barn:'<path d="M3 21V9l9-6 9 6v12"/><path d="M8 21v-8h8v8M3 9h18"/>',
+  utensils:'<path d="M3 3v7a3 3 0 0 0 6 0V3M6 3v18M18 3v18M18 3c-3 3-3 7 0 9h3V3z"/>',
+  scissors:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 12 12M8 16 20 4"/>',
+  dryer:'<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="11" cy="12" r="4"/><path d="M17 9h1M17 15h1"/>',
+  cart:'<circle cx="9" cy="20" r="1"/><circle cx="19" cy="20" r="1"/><path d="M2 3h2l3 13h13l2-9H5"/>',
+  apple:'<path d="M12 8c-5-5-10 0-8 6 2 7 7 8 8 5 1 3 6 2 8-5 2-6-3-11-8-6z"/><path d="M12 7c0-3 2-5 5-5"/>',
+  store:'<path d="M3 10h18l-2-7H5zM5 10v11h14V10M9 21v-7h6v7"/>'
+ };
+ return {color,bg,svg:`<svg viewBox="0 0 24 24" aria-hidden="true">${shapes[id]||shapes.store}</svg>`};
+}
+
+/* TARJETAS */
+function renderAccountCards(){
+ const personal=$("personalGrid"), businesses=$("businessGrid");
+ personal.innerHTML=""; businesses.innerHTML="";
+ state.accounts.forEach(account=>{
+  const isPersonal=inferType(account)==="personal", visual=accountIcon(account);
+  const button=document.createElement("button"); button.type="button";
+  button.className="area-card surface rounded-2xl p-5 text-left shadow";
+  if(state.selectedAccount?.id===account.id)
+   button.classList.add(isPersonal?"selected-personal":"selected-business");
+  const top=document.createElement("div"); top.className="flex items-center gap-3 pr-8";
+  const icon=document.createElement("div"); icon.className="area-icon";
+  icon.style.color=visual.color; icon.style.background=visual.bg; icon.innerHTML=visual.svg;
+  const wrap=document.createElement("div"); wrap.className="min-w-0";
+  const heading=document.createElement("h3"); heading.className="font-bold text-lg break-words";
+  heading.textContent=account.name;
+  const description=document.createElement("p"); description.className="muted text-sm mt-1";
+  description.textContent=accountTypeLabel(account);
+  wrap.append(heading,description); top.append(icon,wrap);
+  const open=document.createElement("p"); open.className="font-bold text-sm mt-4";
+  open.textContent="Abrir área →";
+  button.append(top,open);
+  if(!isPersonal){
+   const menu=document.createElement("div"); menu.className="card-menu";
+   const dots=document.createElement("button"); dots.type="button"; dots.textContent="⋮";
+   dots.setAttribute("aria-label","Opciones del negocio");
+   dots.addEventListener("click",e=>{e.stopPropagation();businessMenu(account);});
+   menu.append(dots); button.append(menu);
+  }
+  button.addEventListener("click",()=>selectAccount(account.id));
+  (isPersonal?personal:businesses).appendChild(button);
+ });
+}
+function businessMenu(account){
+ const action=prompt("Escribe 1 para editar el negocio o 2 para eliminarlo.");
+ if(action==="1"){
+  const newName=normalizeBusinessName(prompt("Nombre del negocio:",account.name)||"");
+  if(!newName)return;
+  const newType=prompt("Tipo de negocio (Barbería, Peluquería, Minimarket, Frutería, Restaurante, Comercio, Agricultura, Ganadería, Negocio de comida u Otro):",accountTypeLabel(account));
+  if(newType)updateBusiness(account,newName,newType);
+ }else if(action==="2"&&confirm("¿Estás seguro? Esta acción no se puede deshacer")){
+  removeBusiness(account);
+ }
+}
+async function updateBusiness(account,name,type){
+ try{
+  const user=await getCurrentUser();
+  await api("/rest/v1/accounts?id=eq."+encodeURIComponent(account.id)+"&user_id=eq."+encodeURIComponent(user.id),{
+   method:"PATCH",headers:{Prefer:"return=representation"},
+   body:JSON.stringify({name,account_type:type.toLocaleLowerCase("es")})
+  });
+  await loadAccountsAndDashboard();
+  status("globalStatus","Negocio actualizado.");
+ }catch(error){status("globalStatus",error.message,true);}
+}
+async function removeBusiness(account){
+ try{
+  const user=await getCurrentUser();
+  await api("/rest/v1/transactions?account_id=eq."+encodeURIComponent(account.id)+"&user_id=eq."+encodeURIComponent(user.id),{method:"DELETE"});
+  await api("/rest/v1/accounts?id=eq."+encodeURIComponent(account.id)+"&user_id=eq."+encodeURIComponent(user.id),{method:"DELETE"});
+  if(state.selectedAccount?.id===account.id){state.selectedAccount=null;$("selectedArea").classList.add("hidden-screen");}
+  await loadAccountsAndDashboard();
+  status("globalStatus","Negocio eliminado.");
+ }catch(error){status("globalStatus",error.message,true);}
+}
+
+/* SELECCIONAR ÁREA */
+async function selectAccount(id){
+ const account=state.accounts.find(a=>a.id===id&&a.user_id===currentUserId());
+ if(!account)return;
+
+ state.selectedAccount=account;
+renderAccountCards();
+ state.historyMode="all";
+ const inheritedCurrency=String(account.limit_currency||"USD").toUpperCase();
+ $("transactionCurrency").value=inheritedCurrency;
+ $("transactionCurrency").disabled=false;
+ $("limitCurrency").value=inheritedCurrency;
+ $("limitCurrency").disabled=false;
+ $("selectedArea").classList.toggle("personal-theme",inferType(account)==="personal");
+ $("selectedArea").classList.toggle("business-theme",inferType(account)!=="personal");
+ state.transactions=[];
+
+ $("selectedArea").classList.remove("hidden-screen");
+ $("selectedTitle").textContent=account.name;
+ $("selectedType").textContent=accountTypeLabel(account);
+ $("allHistoryTab").className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm";
+ $("antHistoryTab").className="hidden-screen rounded-lg bg-slate-200 px-3 py-2 text-sm text-slate-800";
+ $("antSummary").classList.add("hidden-screen");
+
+ /* Se limpian los datos anteriores antes de consultar el área nueva */
+ clearSelectedView();
+ await loadSelectedTransactions();
+ $("selectedArea").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function clearSelectedView(){
+$("expenseLimit").value="";
+$("limitStatus").textContent="";
+ $("incomeSummary").textContent="—";
+ $("expenseSummary").textContent="—";
+ $("balanceSummary").textContent="—";
+ $("transactionsTable").innerHTML="";
+ $("chartNote").textContent="";
+ $("formStatus").textContent="";
+ $("limitAlert").textContent="";
+ $("limitPercentage").textContent="—";
+ $("limitProgress").style.width="0%";
+ if(state.chart){state.chart.destroy();state.chart=null;}
+}
+
+$("backButton").addEventListener("click",()=>{
+ $("selectedArea").classList.add("hidden-screen");
+ state.selectedAccount=null;
+ state.transactions=[];
+renderAccountCards();
+ clearSelectedView();
+});
+
+/* LEER SOLO LOS MOVIMIENTOS DEL ÁREA SELECCIONADA */
+async function loadSelectedTransactions(){
+ if(!state.selectedAccount)return;
+ const user=await getCurrentUser();
+ const account=state.selectedAccount;
+
+ const data=await api(
+  "/rest/v1/transactions?select=id,user_id,account_id,type,description,amount,currency,transaction_date,created_at"+
+  "&user_id=eq."+encodeURIComponent(user.id)+
+  "&account_id=eq."+encodeURIComponent(account.id)+
+  "&order=created_at.desc"
+ );
+
+ state.transactions=(Array.isArray(data)?data:[]).filter(tx=>
+  tx.user_id===user.id&&tx.account_id===account.id
+ );
+
+ renderSelectedArea();
+}
+
+/* CÁLCULOS POR MONEDA */
+function totalsByCurrency(rows){
+ const totals={};
+ rows.forEach(tx=>{
+  const c=(tx.currency||"USD").toUpperCase();
+  if(!totals[c])totals[c]={income:0,expense:0,balance:0};
+  const amount=Number(tx.amount)||0;
+  if(tx.type==="income")totals[c].income+=amount;
+  if(tx.type==="expense")totals[c].expense+=amount;
+ });
+ Object.values(totals).forEach(x=>x.balance=x.income-x.expense);
+ return totals;
+}
+
+function formatMoney(value,currency){
+ try{
+  return new Intl.NumberFormat(state.language==="es"?"es":"en",{
+   style:"currency",currency,maximumFractionDigits:2
+  }).format(value);
+ }catch{return Number(value).toFixed(2)+" "+currency;}
+}
+
+function renderTotal(elementId,totals,key){
+ const element=$(elementId);
+ element.innerHTML="";
+ const currencies=Object.keys(totals).sort();
+ if(!currencies.length){element.textContent="—";return;}
+ currencies.forEach(currency=>{
+  const line=document.createElement("div");
+  line.textContent=formatMoney(totals[currency][key],currency);
+  element.appendChild(line);
+ });
+}
+
+/* LÍMITE: GASTOS ACUMULADOS POR MONEDA */
+function expenseTotals(rows){
+ const totals={};
+ rows.filter(tx=>tx.type==="expense").forEach(tx=>{
+  const c=(tx.currency||"USD").toUpperCase();
+  totals[c]=(totals[c]||0)+(Number(tx.amount)||0);
+ });
+ return totals;
+}
+
+function currentLimit(){
+ const a=state.selectedAccount;
+ if(!a||a.expense_limit===null||a.expense_limit===undefined)return 0;
+ return Number(a.expense_limit)||0;
+}
+
+function currentLimitCurrency(){
+ return String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+}
+
+function expensesForLimit(){
+ return expenseTotals(state.transactions)[currentLimitCurrency()]||0;
+}
+
+function renderLimit(){
+ const limit=currentLimit();
+ const currency=currentLimitCurrency();
+ const expenses=expensesForLimit();
+ const percent=limit>0?expenses/limit*100:0;
+
+ $("expenseLimit").value=limit||"";
+ $("limitCurrency").value=currency;
+ $("limitPercentage").textContent=limit>0?percent.toFixed(1)+"%":"—";
+ $("limitProgressLabel").textContent=
+  "Gastos en "+currency+": "+formatMoney(expenses,currency);
+
+ const bar=$("limitProgress");
+ bar.style.width=Math.min(100,percent)+"%";
+ bar.className="h-full rounded-full transition-all "+
+  (percent>=100?"bg-red-600":percent>=85?"bg-orange-500":"bg-emerald-500");
+
+ if(limit<=0){
+  $("limitAlert").textContent=L("noLimit");
+  $("limitAlert").className="muted mt-3 text-sm";
+ }else if(percent>=100){
+  $("limitAlert").textContent=L("exceeded");
+  $("limitAlert").className="mt-3 text-sm font-bold text-red-600";
+ }else if(percent>=85){
+  $("limitAlert").textContent=L("warning");
+  $("limitAlert").className="mt-3 text-sm font-bold text-orange-600";
+ }else{
+  $("limitAlert").textContent="Límite disponible: "+
+   formatMoney(limit-expenses,currency);
+  $("limitAlert").className="mt-3 text-sm text-emerald-600";
+ }
+
+ updateSaveButton();
+}
+
+$("saveLimitButton").addEventListener("click",async()=>{
+ const button=$("saveLimitButton");
+ button.disabled=true;
+
+ try{
+  const account=state.selectedAccount;
+  const user=await getCurrentUser();
+  const limit=Number($("expenseLimit").value);
+  const currency=String($("limitCurrency").value||"USD").toUpperCase();
+
+ if(!account||account.user_id!==user.id)throw new Error("Área no válida.");
+ if($("expenseLimit").value!==""&&(!Number.isFinite(limit)||limit<0))
+ throw new Error("Introduce un límite válido.");
+
+ await api(
+ "/rest/v1/accounts?id=eq."+encodeURIComponent(account.id)+
+ "&user_id=eq."+encodeURIComponent(user.id),
+ {
+ method:"PATCH",
+ headers:{Prefer:"return=representation"},
+ body:JSON.stringify({
+ expense_limit:$("expenseLimit").value===""?null:limit,
+ limit_currency:currency
+ })
+ }
+ );
+
+ account.expense_limit=$("expenseLimit").value===""?null:limit;
+ account.limit_currency=currency;
+ $("transactionCurrency").value=currency;
+ status("limitStatus","Límite guardado correctamente en "+currency+".");
+ renderSelectedArea();
+ }catch(error){status("limitStatus",error.message,true);}
+ finally{button.disabled=false;}
+});
+
+/* RESUMEN Y GRÁFICA */
+function renderSelectedArea(){
+ if(!state.selectedAccount)return;
+ const currency=String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+ const allTotals=totalsByCurrency(state.transactions);
+ const totals={[currency]:allTotals[currency]||{income:0,expense:0,balance:0}};
+ renderTotal("incomeSummary",totals,"income");
+ renderTotal("expenseSummary",totals,"expense");
+ renderTotal("balanceSummary",totals,"balance");
+ renderLimit();
+ renderChart();
+ renderHistory();
+}
+
+function renderChart(){
+ if(state.chart){state.chart.destroy();state.chart=null;}
+ const currency=String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+
+ if(!currency){
+  $("chartNote").textContent="Todavía no hay movimientos para esta área.";
+  return;
+ }
+
+ const totals=totalsByCurrency(state.transactions)[currency]||{income:0,expense:0,balance:0};
+ const values=[Math.max(0,totals.balance),Math.max(0,totals.expense)];
+ if(values.every(v=>v===0)){
+  $("chartNote").textContent="No hay valores para graficar.";
+  return;
+ }
+
+ $("chartNote").textContent="Moneda mostrada: "+currency+
+  ". Se muestran solo movimientos de la moneda del área seleccionada.";
+
+ state.chart=new Chart($("balanceChart").getContext("2d"),{
+  type:"doughnut",
+  data:{
+   labels:["Balance neto","Gastos"],
+   datasets:[{
+    data:values,
+    backgroundColor:["#2563eb","#e11d48"],
+    borderColor:document.documentElement.classList.contains("dark")?"#1f2937":"#fff",
+    borderWidth:3
+   }]
+  },
+  options:{
+   responsive:true,
+   plugins:{
+    datalabels:{color:"#fff",font:{weight:"bold",size:14},formatter:(value,ctx)=>{const sum=ctx.dataset.data.reduce((a,b)=>a+b,0);return sum?Math.round(value/sum*100)+"%":"";}},
+    legend:{
+     position:"bottom",
+     labels:{color:document.documentElement.classList.contains("dark")?"#fff":"#334155"}
+    },
+    tooltip:{
+     callbacks:{
+      label:ctx=>ctx.label+": "+formatMoney(Number(ctx.raw),currency)
+     }
+    }
+   }
+  }
+ });
+}
+
+/* GASTOS HORMIGA */
+function isAntExpense(tx){
+ if(tx.type!=="expense")return false;
+ const currency=(tx.currency||"USD").toUpperCase();
+ const amount=Number(tx.amount)||0;
+
+ if(["CLP","COP"].includes(currency))return amount<10000;
+ if(currency==="MXN")return amount<100;
+ return amount<10;
+}
+
+function renderHistory(){
+ $("antHistoryTab").classList.remove("hidden-screen");
+
+ const selectedCurrency=String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+ const now=new Date();
+ const antRows=state.transactions.filter(tx=>{
+  const d=new Date(tx.transaction_date||tx.created_at);
+  return isAntExpense(tx)&&(tx.currency||"USD").toUpperCase()===selectedCurrency&&
+   d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+ });
+ const antTotals={};
+ antRows.forEach(tx=>{
+  const c=(tx.currency||"USD").toUpperCase();
+  antTotals[c]=(antTotals[c]||0)+(Number(tx.amount)||0);
+ });
+
+ $("antTotal").innerHTML="";
+ Object.keys(antTotals).sort().forEach(c=>{
+  const line=document.createElement("div");
+  line.textContent=formatMoney(antTotals[c],c);
+  $("antTotal").appendChild(line);
+ });
+
+ $("antSummary").classList.toggle("hidden-screen",state.historyMode!=="ant");
+ if(state.historyMode==="ant"){
+  const sum=antRows.reduce((total,tx)=>total+(Number(tx.amount)||0),0);
+  $("antTotal").textContent=antRows.length
+   ?`Tienes ${antRows.length} gastos hormiga que suman ${formatMoney(sum,selectedCurrency)}. ¡Ahí se te va la plata!`
+   :"Tienes 0 gastos hormiga este mes. ¡Bien!";
+ }
+
+ const rows=state.historyMode==="ant"?antRows:state.transactions;
+
+ const body=$("transactionsTable");
+ body.innerHTML="";
+
+ if(!rows.length){
+  const tr=document.createElement("tr");
+  const td=document.createElement("td");
+  td.colSpan=7;
+  td.className="muted p-5 text-center";
+  td.textContent=L("empty");
+  tr.appendChild(td);
+  body.appendChild(tr);
+  return;
+ }
+
+ rows.forEach(tx=>{
+  const tr=document.createElement("tr");
+  tr.className="border-b border-slate-100";
+
+  const date=document.createElement("td");
+  date.className="p-3 whitespace-nowrap";
+  date.textContent=formatDateTime(tx.created_at||tx.transaction_date);
+
+  const description=document.createElement("td");
+  description.className="p-3";
+  description.textContent=tx.description||"";
+
+  const type=document.createElement("td");
+  type.className="p-3";
+  type.textContent=tx.type==="income"?"Ingreso":"Gasto";
+
+  const currency=document.createElement("td");
+  currency.className="p-3";
+  currency.textContent=(tx.currency||"USD").toUpperCase();
+
+  const amount=document.createElement("td");
+  amount.className="p-3 text-right font-semibold";
+  amount.textContent=formatMoney(Number(tx.amount),(tx.currency||"USD").toUpperCase());
+
+  const tag=document.createElement("td");
+  tag.className="p-3";
+  if(inferType(state.selectedAccount)==="personal"&&isAntExpense(tx)){
+   const badge=document.createElement("span");
+   badge.className="rounded-full bg-amber-100 text-amber-800 px-2 py-1 text-xs font-semibold";
+   badge.textContent="🐜 Gasto Hormiga";
+   tag.appendChild(badge);
+  }else{
+   tag.textContent="—";
+  }
+
+  const actions=document.createElement("td"); actions.className="p-2 whitespace-nowrap";
+  const edit=document.createElement("button"); edit.type="button"; edit.textContent="Editar"; edit.className="text-blue-600 font-semibold mr-3";
+  edit.addEventListener("click",()=>editTransaction(tx));
+  const remove=document.createElement("button"); remove.type="button"; remove.textContent="Eliminar"; remove.className="text-red-600 font-semibold";
+  remove.addEventListener("click",()=>deleteTransaction(tx));
+  actions.append(edit,remove);
+  tr.append(date,description,type,currency,amount,tag,actions);
+  body.appendChild(tr);
+ });
+}
+
+function formatDateTime(timestamp){
+ if(!timestamp)return "—";
+ const d=new Date(timestamp);
+ if(Number.isNaN(d.getTime()))return "—";
+ return new Intl.DateTimeFormat("es-CL",{
+  day:"2-digit",month:"2-digit",year:"numeric",
+  hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+ }).format(d);
+}
+
+$("allHistoryTab").addEventListener("click",()=>{
+ state.historyMode="all";
+ $("allHistoryTab").className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm";
+ $("antHistoryTab").className="rounded-lg bg-slate-200 px-3 py-2 text-sm text-slate-800";
+ renderHistory();
+});
+
+$("antHistoryTab").addEventListener("click",()=>{
+ state.historyMode="ant";
+ $("antHistoryTab").className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm";
+ $("allHistoryTab").className="rounded-lg bg-slate-200 px-3 py-2 text-sm text-slate-800";
+ renderHistory();
+});
+
+/* BLOQUEO POR LÍMITE */
+function updateSaveButton(){
+ const button=$("saveTransactionButton");
+ if(!button)return;
+
+ const isExpense=$("transactionType").value==="expense";
+ const limit=currentLimit();
+ const currency=currentLimitCurrency();
+ const expenses=expensesForLimit();
+ const selectedCurrency=$("transactionCurrency").value;
+ const amount=Number($("transactionAmount").value)||0;
+
+ let blocked=false;
+
+ if(limit>0&&isExpense&&selectedCurrency===currency){
+  blocked=expenses>=limit||expenses+amount>=limit;
+ }
+
+ button.disabled=blocked;
+ button.classList.toggle("opacity-50",blocked);
+ button.title=blocked?L("exceeded"):"";
+}
+
+["transactionType","transactionAmount","transactionCurrency"].forEach(id=>{
+ $(id).addEventListener("input",updateSaveButton);
+ $(id).addEventListener("change",updateSaveButton);
+});
+
+let editingTransactionId=null;
+function editTransaction(tx){
+ editingTransactionId=tx.id;
+ $("transactionType").value=tx.type;
+ $("transactionDate").value=String(tx.transaction_date||"").slice(0,10);
+ $("transactionCurrency").value=String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+ $("transactionDescription").value=tx.description||"";
+ $("transactionAmount").value=tx.amount;
+ $("saveTransactionButton").textContent="Actualizar movimiento";
+ $("transactionForm").scrollIntoView({behavior:"smooth",block:"center"});
+}
+async function deleteTransaction(tx){
+ if(!confirm("¿Estás seguro? Esta acción no se puede deshacer"))return;
+ try{
+  const user=await getCurrentUser();
+  await api("/rest/v1/transactions?id=eq."+encodeURIComponent(tx.id)+"&user_id=eq."+encodeURIComponent(user.id)+"&account_id=eq."+encodeURIComponent(state.selectedAccount.id),{method:"DELETE"});
+  await loadSelectedTransactions();
+  status("formStatus","Movimiento eliminado.");
+ }catch(error){status("formStatus",error.message,true);}
+}
+function resetTransactionForm(){
+ editingTransactionId=null;
+ $("transactionForm").reset();
+ setToday();
+ $("transactionCurrency").value=String(state.selectedAccount?.limit_currency||"USD").toUpperCase();
+ $("transactionCurrency").disabled=false;
+ $("saveTransactionButton").textContent="Guardar movimiento";
+}
+/* GUARDAR MOVIMIENTO */
+$("transactionForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const button=$("saveTransactionButton");
+ button.disabled=true;
+
+ try{
+  const user=await getCurrentUser();
+  const account=state.selectedAccount;
+
+  if(!account||account.user_id!==user.id)
+   throw new Error("No hay un área válida seleccionada.");
+
+  const payload={
+   user_id:user.id,
+   account_id:account.id,
+   type:$("transactionType").value,
+   description:$("transactionDescription").value.trim(),
+   amount:Number($("transactionAmount").value),
+   currency:$("transactionCurrency").value,
+   transaction_date:$("transactionDate").value
+  };
+
+  if(!payload.description||!Number.isFinite(payload.amount)||payload.amount<=0)
+   throw new Error("Revisa la descripción y el monto.");
+  if(!payload.transaction_date)throw new Error("Selecciona una fecha.");
+
+  if(payload.type==="expense"&&
+    payload.currency===currentLimitCurrency()&&
+    currentLimit()>0&&
+    expensesForLimit()+payload.amount>=currentLimit()){
+   renderLimit();
+   throw new Error(L("exceeded"));
+  }
+
+  if(editingTransactionId){
+   delete payload.user_id; delete payload.account_id;
+   await api("/rest/v1/transactions?id=eq."+encodeURIComponent(editingTransactionId)+"&user_id=eq."+encodeURIComponent(user.id)+"&account_id=eq."+encodeURIComponent(account.id),{
+    method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)
+   });
+   status("formStatus","Movimiento actualizado");
+  }else{
+   await api("/rest/v1/transactions",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});
+   status("formStatus",L("saved"));
+  }
+  resetTransactionForm();
+  await loadSelectedTransactions();
+ }catch(error){
+  status("formStatus",error.message||L("saveError"),true);
+ }finally{
+  updateSaveButton();
+ }
+});
+
+/* FECHA LOCAL */
+function setToday(){
+ const now=new Date();
+ const local=new Date(now.getTime()-now.getTimezoneOffset()*60000);
+ $("transactionDate").value=local.toISOString().slice(0,10);
+}
+
+/* CARGA GENERAL */
+async function loadAccountsAndDashboard(){
+ await ensureAccounts();
+ renderAccountCards();
+
+ if(state.selectedAccount){
+  const fresh=state.accounts.find(a=>a.id===state.selectedAccount.id);
+  if(fresh){
+   state.selectedAccount=fresh;
+   $("selectedTitle").textContent=fresh.name;
+   $("selectedType").textContent=accountTypeLabel(fresh);
+   await loadSelectedTransactions();
+  }else{
+   state.selectedAccount=null;
+   $("selectedArea").classList.add("hidden-screen");
+  }
+ }
+}
+
+async function showApplication(){
+ $("loginScreen").classList.add("hidden-screen");
+ $("appScreen").classList.remove("hidden-screen");
+ await loadAccountsAndDashboard();
+}
+/* FILTRO POR MES Y EXPORTACIÓN (EXCEL / PDF) */
+state.selectedMonth = "all";
+
+function populateMonthFilter() {
+  const select = $("monthFilter");
+  if (!select) return;
+
+  const currentVal = state.selectedMonth || "all";
+  const months = new Set();
+
+  state.transactions.forEach(tx => {
+    const rawDate = tx.transaction_date || tx.created_at;
+    if (rawDate) {
+      const ym = String(rawDate).slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(ym)) months.add(ym);
+    }
+  });
+
+  const sorted = Array.from(months).sort().reverse();
+  select.innerHTML = '<option value="all">Todos los meses</option>';
+
+  sorted.forEach(ym => {
+    const [year, month] = ym.split("-");
+    const dateObj = new Date(Number(year), Number(month) - 1, 1);
+    const label = dateObj.toLocaleDateString(state.language === "es" ? "es-ES" : "en-US", {
+      month: "long",
+      year: "numeric"
+    });
+    const opt = document.createElement("option");
+    opt.value = ym;
+    opt.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+    select.appendChild(opt);
+  });
+
+  select.value = sorted.includes(currentVal) ? currentVal : "all";
+  state.selectedMonth = select.value;
+}
+
+function getFilteredTransactions() {
+  let rows = state.transactions;
+
+  if (state.selectedMonth && state.selectedMonth !== "all") {
+    rows = rows.filter(tx => {
+      const rawDate = String(tx.transaction_date || tx.created_at || "");
+      return rawDate.startsWith(state.selectedMonth);
+    });
+  }
+
+  if (state.historyMode === "ant") {
+    const selectedCurrency = String(state.selectedAccount?.limit_currency || "USD").toUpperCase();
+    rows = rows.filter(tx => isAntExpense(tx) && (tx.currency || "USD").toUpperCase() === selectedCurrency);
+  }
+
+  return rows;
+}
+
+$("monthFilter")?.addEventListener("change", e => {
+  state.selectedMonth = e.target.value;
+  renderHistory();
+});
+
+const _originalRenderHistory = renderHistory;
+renderHistory = function() {
+  populateMonthFilter();
+  const originalTx = state.transactions;
+  const byMonth = state.selectedMonth === "all"
+    ? originalTx
+    : originalTx.filter(tx => String(tx.transaction_date || tx.created_at || "").startsWith(state.selectedMonth));
+
+  state.transactions = byMonth;
+  _originalRenderHistory();
+  state.transactions = originalTx;
+};
+
+/* EXPORTAR A EXCEL */
+$("exportExcelButton")?.addEventListener("click", () => {
+  if (typeof XLSX === "undefined") {
+    status("historyStatus", "Error: La librería de Excel no cargó. Revisa tu conexión.", true);
+    return;
+  }
+
+  const rows = getFilteredTransactions();
+  if (!rows.length) {
+    status("historyStatus", "No hay movimientos para exportar en este filtro.", true);
+    return;
+  }
+
+  const areaName = state.selectedAccount?.name || "Area";
+  const data = rows.map(tx => ({
+    "Fecha y hora": formatDateTime(tx.created_at || tx.transaction_date),
+    "Descripción": tx.description || "",
+    "Tipo": tx.type === "income" ? "Ingreso" : "Gasto",
+    "Moneda": (tx.currency || "USD").toUpperCase(),
+    "Monto": Number(tx.amount) || 0,
+    "Etiqueta": (inferType(state.selectedAccount) === "personal" && isAntExpense(tx)) ? "Gasto Hormiga" : "Normal"
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+
+  const fileName = `Reporte_${areaName.replace(/\s+/g, "_")}_${state.selectedMonth}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  status("historyStatus", "Archivo Excel generado: " + fileName);
+});
+
+/* EXPORTAR A PDF */
+$("exportPdfButton")?.addEventListener("click", () => {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    status("historyStatus", "Error: La librería de PDF no cargó. Revisa tu conexión.", true);
+    return;
+  }
+
+  const rows = getFilteredTransactions();
+  if (!rows.length) {
+    status("historyStatus", "No hay movimientos para exportar en este filtro.", true);
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const areaName = state.selectedAccount?.name || "Área";
+
+  doc.setFontSize(16);
+  doc.text(`Mi Control Empresarial - ${areaName}`, 14, 18);
+  doc.setFontSize(10);
+  doc.text(`Filtro: ${state.selectedMonth === "all" ? "Todos los meses" : state.selectedMonth}`, 14, 25);
+
+  const tableRows = rows.map(tx => [
+    formatDateTime(tx.created_at || tx.transaction_date),
+    tx.description || "",
+    tx.type === "income" ? "Ingreso" : "Gasto",
+    (tx.currency || "USD").toUpperCase(),
+    formatMoney(Number(tx.amount), (tx.currency || "USD").toUpperCase()),
+    (inferType(state.selectedAccount) === "personal" && isAntExpense(tx)) ? "Gasto Hormiga" : "—"
+  ]);
+
+  doc.autoTable({
+    startY: 30,
+    head: [["Fecha y hora", "Descripción", "Tipo", "Moneda", "Monto", "Etiqueta"]],
+    body: tableRows,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: "#1e293b" }
+  });
+
+  const fileName = `Reporte_${areaName.replace(/\s+/g, "_")}_${state.selectedMonth}.pdf`;
+  doc.save(fileName);
+  status("historyStatus", "Archivo PDF generado: " + fileName);
+});
+/* MODO SIN INTERNET (CACHÉ OFFLINE + COLA DE SINCRONIZACIÓN) */
+const OFFLINE_CACHE_KEY = "mce_offline_cache_v1";
+const OFFLINE_QUEUE_KEY = "mce_offline_queue_v1";
+
+function loadOfflineCache() {
+  try { return JSON.parse(storage.get(OFFLINE_CACHE_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveOfflineCache(patch) {
+  const current = loadOfflineCache();
+  storage.set(OFFLINE_CACHE_KEY, JSON.stringify({ ...current, ...patch }));
+}
+
+function loadOfflineQueue() {
+  try { return JSON.parse(storage.get(OFFLINE_QUEUE_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveOfflineQueue(queue) {
+  storage.set(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function isNetworkError(err) {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return !navigator.onLine || msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed");
+}
+
+const _originalApi = api;
+api = async function(path, options = {}, retry = true) {
+  const method = String(options.method || "GET").toUpperCase();
+
+  try {
+    const res = await _originalApi(path, options, retry);
+
+    if (method === "GET") {
+      if (path.startsWith("/auth/v1/user") && res?.id) {
+        saveOfflineCache({ user: res });
+      } else if (path.startsWith("/rest/v1/accounts") && Array.isArray(res)) {
+        saveOfflineCache({ accounts: res });
+      } else if (path.startsWith("/rest/v1/transactions") && Array.isArray(res)) {
+        const match = path.match(/account_id=eq\.([^&]+)/);
+        const accId = match ? decodeURIComponent(match.at(1)) : "";
+        if (accId) {
+          const cache = loadOfflineCache();
+          const txMap = cache.transactions || {};
+          txMap[accId] = res;
+          saveOfflineCache({ transactions: txMap });
+        }
+      }
+    }
+    return res;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+
+    const cache = loadOfflineCache();
+
+    if (method === "GET") {
+      if (path.startsWith("/auth/v1/user") && (cache.user || state.user)) {
+        return cache.user || state.user;
+      }
+      if (path.startsWith("/rest/v1/accounts") && Array.isArray(cache.accounts)) {
+        status("globalStatus", "📡 Modo sin internet: mostrando datos guardados en el dispositivo.");
+        return cache.accounts;
+      }
+      if (path.startsWith("/rest/v1/transactions")) {
+        const match = path.match(/account_id=eq\.([^&]+)/);
+        const accId = match ? decodeURIComponent(match.at(1)) : "";
+        const cachedList = cache.transactions?.[accId] || [];
+        const pendingCreates = loadOfflineQueue()
+          .filter(q => q.method === "POST" && q.path === "/rest/v1/transactions" && q.localTx?.account_id === accId)
+          .map(q => q.localTx);
+        return [...pendingCreates, ...cachedList];
+      }
+    }
+
+    if (["POST", "PATCH", "DELETE"].includes(method)) {
+      const queue = loadOfflineQueue();
+      const bodyObj = options.body ? JSON.parse(options.body) : null;
+      let localTx = null;
+
+      if (method === "POST" && path === "/rest/v1/transactions" && bodyObj) {
+        localTx = {
+          ...bodyObj,
+          id: "offline_" + Date.now(),
+          created_at: new Date().toISOString()
+        };
+      }
+
+      queue.push({ id: Date.now(), path, options, method, localTx });
+      saveOfflineQueue(queue);
+      status("globalStatus", "📡 Sin conexión: cambio guardado localmente. Se subirá al volver internet.");
+      return localTx ? [localTx] : [];
+    }
+
+    throw err;
+  }
+};
+
+async function syncOfflineQueue() {
+  if (!navigator.onLine || !state.accessToken) return;
+  const queue = loadOfflineQueue();
+  if (!queue.length) return;
+
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      await _originalApi(item.path, item.options);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        remaining.push(item);
+      }
+    }
+  }
+  saveOfflineQueue(remaining);
+  if (!remaining.length) {
+    status("globalStatus", "✅ Datos offline sincronizados con la nube.");
+    if (state.user) await loadAccountsAndDashboard();
+  }
+}
+
+window.addEventListener("online", syncOfflineQueue);
+
+/* =========================================================
+   NAVEGACIÓN DE PORTADA Y ZONA EMPRESARIAL (9 MÓDULOS)
+   ========================================================= */
+state.entBusiness = null;
+state.entModule = null;
+state.entRecords = [];
+
+const ENT_MODULES = {
+  inventario: {
+    icon: "📦", name: "Control de Inventario", color: "#0284c7",
+    desc: "Registro de productos, insumos, existencias y valor en stock",
+    titleLabel: "Producto / Insumo", partyLabel: "Proveedor / Ubicación", categoryLabel: "Categoría",
+    qtyLabel: "Cantidad en stock", unitLabel: "Unidad (und, kg, lt)", amountLabel: "Valor total stock",
+    showParty: true, showCategory: true, showQty: true, showUnit: true, showAmount: true, showStatus: false, hideForm: false
+  },
+  ventas: {
+    icon: "💰", name: "Control de Ventas", color: "#16a34a",
+    desc: "Registro diario de ventas de productos y servicios",
+    titleLabel: "Producto / Servicio vendido", partyLabel: "Cliente", categoryLabel: "Método de pago",
+    qtyLabel: "Cantidad vendida", unitLabel: "Unidad", amountLabel: "Total venta",
+    showParty: true, showCategory: true, showQty: true, showUnit: false, showAmount: true, showStatus: false, hideForm: false
+  },
+  gastos: {
+    icon: "💸", name: "Control de Gastos", color: "#dc2626",
+    desc: "Gastos operativos, compras de insumos y costos del negocio",
+    titleLabel: "Concepto del gasto", partyLabel: "Proveedor", categoryLabel: "Categoría de gasto",
+    qtyLabel: "Cantidad", unitLabel: "Unidad", amountLabel: "Monto gastado",
+    showParty: true, showCategory: true, showQty: false, showUnit: false, showAmount: true, showStatus: false, hideForm: false
+  },
+  por_cobrar: {
+    icon: "📥", name: "Control por Cobrar", color: "#d97706",
+    desc: "Ventas fiadas, créditos a clientes y saldos pendientes de cobro",
+    titleLabel: "Concepto / Factura", partyLabel: "Nombre del cliente", categoryLabel: "Referencia",
+    qtyLabel: "Cantidad", unitLabel: "Unidad", amountLabel: "Monto por cobrar",
+    showParty: true, showCategory: false, showQty: false, showUnit: false, showAmount: true, showStatus: true, hideForm: false
+  },
+  por_pagar: {
+    icon: "📤", name: "Control de Cuentas por Pagar", color: "#9333ea",
+    desc: "Facturas a proveedores, préstamos y compromisos pendientes",
+    titleLabel: "Concepto / Factura", partyLabel: "Proveedor / Acreedor", categoryLabel: "Referencia",
+    qtyLabel: "Cantidad", unitLabel: "Unidad", amountLabel: "Monto a pagar",
+    showParty: true, showCategory: false, showQty: false, showUnit: false, showAmount: true, showStatus: true, hideForm: false
+  },
+  flujo_caja: {
+    icon: "🏦", name: "Control de Flujo de Caja", color: "#0f766e",
+    desc: "Balance real en tiempo real: entradas de dinero menos salidas",
+    titleLabel: "Movimiento directo de caja", partyLabel: "Detalle", categoryLabel: "Tipo (Entrada / Salida)",
+    qtyLabel: "Cantidad", unitLabel: "Unidad", amountLabel: "Monto",
+    showParty: false, showCategory: false, showQty: false, showUnit: false, showAmount: false, showStatus: false, hideForm: true
+  },
+  produccion: {
+    icon: "⚙️", name: "Control de Producción", color: "#4f46e5",
+    desc: "Control de lotes elaborados, cosechas o servicios producidos",
+    titleLabel: "Producto elaborado / cosechado", partyLabel: "Responsable / Área", categoryLabel: "N° de Lote",
+    qtyLabel: "Cantidad producida", unitLabel: "Unidad (und, kg, cajas)", amountLabel: "Costo de producción",
+    showParty: true, showCategory: true, showQty: true, showUnit: true, showAmount: true, showStatus: false, hideForm: false
+  },
+  rentabilidad: {
+    icon: "📈", name: "Control de Rentabilidad", color: "#be185d",
+    desc: "Análisis automático de margen de ganancia sobre ventas y costos",
+    titleLabel: "", partyLabel: "", categoryLabel: "", qtyLabel: "", unitLabel: "", amountLabel: "",
+    showParty: false, showCategory: false, showQty: false, showUnit: false, showAmount: false, showStatus: false, hideForm: true
+  },
+  personal: {
+    icon: "👷", name: "Control de Personal", color: "#0369a1",
+    desc: "Control de trabajadores, jornadas, sueldos y pagos realizados",
+    titleLabel: "Concepto (Sueldo / Bono / Turno)", partyLabel: "Nombre del trabajador", categoryLabel: "Cargo / Puesto",
+    qtyLabel: "Días / Horas trabajadas", unitLabel: "Unidad (días, hrs)", amountLabel: "Pago total",
+    showParty: true, showCategory: true, showQty: true, showUnit: true, showAmount: true, showStatus: true, hideForm: false
+  }
+};
+
+/* Mostrar vista limpia */
+function showHubView(view) {
+  $("homeHub").classList.toggle("hidden-screen", view !== "home");
+  $("businessHub").classList.toggle("hidden-screen", view !== "businesses");
+  $("selectedArea").classList.toggle("hidden-screen", view !== "personal");
+  $("enterpriseArea").classList.toggle("hidden-screen", view !== "enterprise");
+  $("businessModal").classList.add("hidden-screen");
+}
+
+/* Botón Portada -> Área Personal */
+$("openPersonalHubBtn")?.addEventListener("click", async () => {
+  const personalAcc = state.accounts.find(a => inferType(a) === "personal");
+  if (!personalAcc) return;
+  showHubView("personal");
+  await selectAccount(personalAcc.id);
+});
+
+/* Botón Portada -> Mis Negocios */
+$("openBusinessHubBtn")?.addEventListener("click", () => {
+  showHubView("businesses");
+  renderAccountCards();
+});
+
+/* Botón Volver desde Mis Negocios -> Portada */
+$("backFromBusinessHubBtn")?.addEventListener("click", () => {
+  showHubView("home");
+});
+
+/* Ajuste al botón Volver del Área Personal para regresar a la Portada */
+$("backButton")?.addEventListener("click", () => {
+  showHubView("home");
+});
+
+/* Redirigir el clic en las tarjetas de negocio hacia el Panel Empresarial */
+const _origSelectAccount = selectAccount;
+selectAccount = async function(id) {
+  const account = state.accounts.find(a => a.id === id && a.user_id === currentUserId());
+  if (!account) return;
+  if (inferType(account) === "personal") {
+    showHubView("personal");
+    return _origSelectAccount(id);
+  }
+  await openEnterpriseBusiness(account);
+};
+
+/* Abrir Panel Empresarial de un negocio */
+async function openEnterpriseBusiness(account) {
+  state.entBusiness = account;
+  state.entModule = null;
+  $("entBusinessTitle").textContent = account.name;
+  $("entBusinessType").textContent = accountTypeLabel(account);
+  $("entModuleWorkspace").classList.add("hidden-screen");
+  showHubView("enterprise");
+  renderEnterpriseModulesGrid();
+  await loadEnterpriseRecords();
+}
+
+$("backFromEnterpriseBtn")?.addEventListener("click", () => {
+  state.entBusiness = null;
+  state.entModule = null;
+  showHubView("businesses");
+});
+
+/* Dibujar las 9 tarjetas de control */
+function renderEnterpriseModulesGrid() {
+  const grid = $("entModulesGrid");
+  grid.innerHTML = "";
+  Object.entries(ENT_MODULES).forEach(([key, mod]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "area-card surface rounded-2xl p-4 text-left shadow border-2 " +
+      (state.entModule === key ? "border-sky-500" : "border-transparent");
+    btn.innerHTML = `
+      <div class="flex items-center gap-3">
+        <div class="area-icon text-2xl" style="color:${mod.color};background:${mod.color}18">${mod.icon}</div>
+        <div class="min-w-0">
+          <h3 class="font-bold text-base">${mod.name}</h3>
+          <p class="muted text-xs mt-1 line-clamp-2">${mod.desc}</p>
+        </div>
+      </div>
+    `;
+    btn.addEventListener("click", () => openEnterpriseModule(key));
+    grid.appendChild(btn);
+  });
+}
+
+/* Cargar registros empresariales desde Supabase (con soporte offline) */
+async function loadEnterpriseRecords() {
+  if (!state.entBusiness) return;
+  const user = await getCurrentUser();
+  const accId = state.entBusiness.id;
+  const cacheKey = "mce_ent_records_" + accId;
+
+  try {
+    const rows = await api(
+      "/rest/v1/business_records?select=*&user_id=eq." + encodeURIComponent(user.id) +
+      "&account_id=eq." + encodeURIComponent(accId) + "&order=record_date.desc,created_at.desc"
+    );
+    state.entRecords = Array.isArray(rows) ? rows : [];
+    storage.set(cacheKey, JSON.stringify(state.entRecords));
+  } catch (e) {
+    try { state.entRecords = JSON.parse(storage.get(cacheKey) || "[]"); }
+    catch { state.entRecords = []; }
+  }
+  if (state.entModule) renderEnterpriseWorkspace();
+}
+
+/* Abrir un control específico */
+function openEnterpriseModule(modKey) {
+  state.entModule = modKey;
+$("entInputTitle").value = "";
+  $("entInputParty").value = "";
+  $("entInputCategory").value = "";
+  $("entInputQty").value = "1";
+  $("entInputUnit").value = "";
+  $("entInputAmount").value = "";
+  $("entFormStatus").textContent = "";
+  renderEnterpriseModulesGrid();
+  const mod = ENT_MODULES[modKey];
+  $("entModuleTitle").textContent = `${mod.icon} ${mod.name}`;
+  $("entModuleDesc").textContent = mod.desc;
+  $("entModuleWorkspace").classList.remove("hidden-screen");
+
+  $("entFormSection").classList.toggle("hidden-screen", !!mod.hideForm);
+  $("entLabelTitle").textContent = mod.titleLabel;
+  $("entLabelParty").textContent = mod.partyLabel;
+  $("entLabelCategory").textContent = mod.categoryLabel;
+  $("entLabelQty").textContent = mod.qtyLabel;
+  $("entLabelUnit").textContent = mod.unitLabel;
+  $("entLabelAmount").textContent = mod.amountLabel;
+
+  $("entFieldPartyWrap").classList.toggle("hidden-screen", !mod.showParty);
+  $("entFieldCategoryWrap").classList.toggle("hidden-screen", !mod.showCategory);
+  $("entFieldQtyWrap").classList.toggle("hidden-screen", !mod.showQty);
+  $("entFieldUnitWrap").classList.toggle("hidden-screen", !mod.showUnit);
+  $("entFieldAmountWrap").classList.toggle("hidden-screen", !mod.showAmount);
+  $("entFieldStatusWrap").classList.toggle("hidden-screen", !mod.showStatus);
+
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  $("entInputDate").value = local.toISOString().slice(0, 10);
+  $("entInputCurrency").value = String(state.entBusiness?.limit_currency || "USD").toUpperCase();
+  $("entInputStatus").value = (modKey === "por_cobrar" || modKey === "por_pagar") ? "pending" : "completed";
+
+  renderEnterpriseWorkspace();
+  $("entModuleWorkspace").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("closeEntModuleBtn")?.addEventListener("click", () => {
+  state.entModule = null;
+  $("entModuleWorkspace").classList.add("hidden-screen");
+  renderEnterpriseModulesGrid();
+});
+
+/* Dibujar resúmenes y tabla del módulo activo */
+function renderEnterpriseWorkspace() {
+  const key = state.entModule;
+  if (!key) return;
+  const sumBox = $("entSummaryCards");
+  const tbody = $("entRecordsTable");
+  sumBox.innerHTML = "";
+  tbody.innerHTML = "";
+
+  const defaultCurr = String(state.entBusiness?.limit_currency || "USD").toUpperCase();
+  let rows = state.entRecords.filter(r => r.module === key);
+
+  if (key === "flujo_caja") {
+    const entradas = state.entRecords
+      .filter(r => r.module === "ventas" || (r.module === "por_cobrar" && r.status === "completed"))
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const salidas = state.entRecords
+      .filter(r => r.module === "gastos" || r.module === "personal" || (r.module === "por_pagar" && r.status === "completed"))
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const neto = entradas - salidas;
+    sumBox.innerHTML = `
+      <div class="rounded-2xl bg-emerald-600 p-4 text-white shadow"><p class="text-xs">Entradas reales</p><p class="text-xl font-bold mt-1">${formatMoney(entradas, defaultCurr)}</p></div>
+      <div class="rounded-2xl bg-rose-600 p-4 text-white shadow"><p class="text-xs">Salidas reales</p><p class="text-xl font-bold mt-1">${formatMoney(salidas, defaultCurr)}</p></div>
+      <div class="rounded-2xl bg-blue-700 p-4 text-white shadow"><p class="text-xs">Flujo neto en caja</p><p class="text-xl font-bold mt-1">${formatMoney(neto, defaultCurr)}</p></div>
+    `;
+    rows = state.entRecords.filter(r => ["ventas", "gastos", "por_cobrar", "por_pagar", "personal"].includes(r.module));
+  } else if (key === "rentabilidad") {
+    const ventasTot = state.entRecords.filter(r => r.module === "ventas").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const costosTot = state.entRecords.filter(r => ["gastos", "produccion", "personal"].includes(r.module)).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const utilidad = ventasTot - costosTot;
+    const margen = ventasTot > 0 ? ((utilidad / ventasTot) * 100).toFixed(1) : "0.0";
+    sumBox.innerHTML = `
+      <div class="rounded-2xl bg-emerald-600 p-4 text-white shadow"><p class="text-xs">Ventas totales</p><p class="text-xl font-bold mt-1">${formatMoney(ventasTot, defaultCurr)}</p></div>
+      <div class="rounded-2xl bg-rose-600 p-4 text-white shadow"><p class="text-xs">Costos y gastos</p><p class="text-xl font-bold mt-1">${formatMoney(costosTot, defaultCurr)}</p></div>
+      <div class="rounded-2xl bg-purple-700 p-4 text-white shadow"><p class="text-xs">Utilidad / Margen</p><p class="text-xl font-bold mt-1">${formatMoney(utilidad, defaultCurr)} (${margen}%)</p></div>
+    `;
+    rows = state.entRecords.filter(r => ["ventas", "gastos", "produccion", "personal"].includes(r.module));
+  } else {
+    const totalMod = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const pendMod = rows.filter(r => r.status === "pending").reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    sumBox.innerHTML = `
+      <div class="rounded-2xl bg-sky-600 p-4 text-white shadow"><p class="text-xs">Registros en módulo</p><p class="text-xl font-bold mt-1">${rows.length}</p></div>
+      <div class="rounded-2xl bg-emerald-600 p-4 text-white shadow"><p class="text-xs">Monto acumulado</p><p class="text-xl font-bold mt-1">${formatMoney(totalMod, defaultCurr)}</p></div>
+      <div class="rounded-2xl bg-amber-600 p-4 text-white shadow"><p class="text-xs">Saldo pendiente</p><p class="text-xl font-bold mt-1">${formatMoney(pendMod, defaultCurr)}</p></div>
+    `;
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="muted p-5 text-center">No hay registros todavía en este control.</td></tr>`;
+    return;
+  }
+
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-slate-100";
+    const modOrigin = ENT_MODULES[r.module]?.name || r.module;
+    const isPending = r.status === "pending";
+    tr.innerHTML = `
+      <td class="p-3 whitespace-nowrap">${r.record_date || "—"}</td>
+      <td class="p-3 font-semibold">${r.title}<div class="muted text-xs font-normal">${modOrigin}</div></td>
+      <td class="p-3">${[r.party, r.category].filter(Boolean).join(" · ") || "—"}</td>
+      <td class="p-3 text-right">${Number(r.quantity) ? `${r.quantity} ${r.unit || ""}` : "—"}</td>
+      <td class="p-3 text-right font-bold">${formatMoney(Number(r.amount) || 0, r.currency || defaultCurr)}</td>
+      <td class="p-3">
+        <span class="rounded-full px-2 py-1 text-xs font-semibold ${isPending ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}">
+          ${isPending ? "Pendiente" : "Completado"}
+        </span>
+      </td>
+      <td class="p-3 whitespace-nowrap space-x-2">
+        ${isPending ? `<button type="button" class="text-emerald-600 font-semibold" data-pay="${r.id}">Marcar pagado</button>` : ""}
+        <button type="button" class="text-red-600 font-semibold" data-del="${r.id}">Eliminar</button>
+      </td>
+    `;
+    tr.querySelector("[data-pay]")?.addEventListener("click", () => toggleEnterpriseStatus(r));
+    tr.querySelector("[data-del]")?.addEventListener("click", () => deleteEnterpriseRecord(r));
+    tbody.appendChild(tr);
+  });
+}
+
+/* Guardar registro empresarial */
+$("entRecordForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("entSaveBtn");
+  btn.disabled = true;
+  try {
+    const user = await getCurrentUser();
+    const payload = {
+      user_id: user.id,
+      account_id: state.entBusiness.id,
+      module: state.entModule,
+      title: $("entInputTitle").value.trim(),
+      party: $("entInputParty").value.trim(),
+      category: $("entInputCategory").value.trim(),
+      quantity: Number($("entInputQty").value) || 0,
+      unit: $("entInputUnit").value.trim(),
+      amount: Number($("entInputAmount").value) || 0,
+      currency: $("entInputCurrency").value,
+      status: $("entInputStatus").value,
+      record_date: $("entInputDate").value
+    };
+    await api("/rest/v1/business_records", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(payload)
+    });
+    $("entInputTitle").value = "";
+    $("entInputParty").value = "";
+    $("entInputCategory").value = "";
+    $("entInputAmount").value = "";
+    status("entFormStatus", "Registro guardado correctamente.");
+    await loadEnterpriseRecords();
+  } catch (err) {
+    status("entFormStatus", err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function toggleEnterpriseStatus(rec) {
+  try {
+    const user = await getCurrentUser();
+    await api("/rest/v1/business_records?id=eq." + encodeURIComponent(rec.id) + "&user_id=eq." + encodeURIComponent(user.id), {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "completed" })
+    });
+    await loadEnterpriseRecords();
+  } catch (err) { status("entFormStatus", err.message, true); }
+}
+
+async function deleteEnterpriseRecord(rec) {
+  if (!confirm("¿Eliminar este registro empresarial?")) return;
+  try {
+    const user = await getCurrentUser();
+    await api("/rest/v1/business_records?id=eq." + encodeURIComponent(rec.id) + "&user_id=eq." + encodeURIComponent(user.id), {
+      method: "DELETE"
+    });
+    await loadEnterpriseRecords();
+  } catch (err) { status("entFormStatus", err.message, true); }
+}
+
+/* Exportar Excel y PDF del módulo empresarial */
+$("entExportExcelBtn")?.addEventListener("click", () => {
+  if (typeof XLSX === "undefined") return;
+  const rows = state.entRecords.filter(r => r.module === state.entModule);
+  if (!rows.length) return;
+  const data = rows.map(r => ({
+    Fecha: r.record_date,
+    Concepto: r.title,
+    Tercero: r.party,
+    Detalle: r.category,
+    Cantidad: r.quantity,
+    Unidad: r.unit,
+    Monto: r.amount,
+    Moneda: r.currency,
+    Estado: r.status === "pending" ? "Pendiente" : "Completado"
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+  XLSX.writeFile(wb, `${state.entBusiness.name}_${state.entModule}.xlsx`);
+});
+
+$("entExportPdfBtn")?.addEventListener("click", () => {
+  if (!window.jspdf?.jsPDF) return;
+  const rows = state.entRecords.filter(r => r.module === state.entModule);
+  if (!rows.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const modName = ENT_MODULES[state.entModule]?.name || state.entModule;
+  doc.setFontSize(15);
+  doc.text(`${state.entBusiness.name} - ${modName}`, 14, 18);
+  doc.autoTable({
+    startY: 25,
+    head: [["Fecha", "Concepto", "Tercero/Detalle", "Cant.", "Monto", "Estado"]],
+    body: rows.map(r => [r.record_date, r.title, `${r.party} ${r.category}`.trim(), `${r.quantity} ${r.unit}`.trim(), `${r.amount} ${r.currency}`, r.status === "pending" ? "Pendiente" : "Completado"]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: "#0284c7" }
+  });
+  doc.save(`${state.entBusiness.name}_${state.entModule}.pdf`);
+});
+
+
+/* INICIO */
+async function initialize(){
+ applyTheme();
+ $("languageSelect").value=state.language;
+ setToday();
+
+ try{validateConfig();}
+ catch(error){status("loginStatus",error.message,true);return;}
+
+ loadSession();
+
+ if(state.accessToken){
+  try{
+   await getCurrentUser();
+   await showApplication();
+   return;
+  }catch(error){console.warn(error);}
+ }
+
+ if(state.refreshToken&&await refreshSession()){
+  try{
+   await showApplication();
+   return;
+  }catch(error){console.error(error);}
+ }
+
+ clearSession();
+ $("loginScreen").classList.remove("hidden-screen");
+}
+
+initialize();
+</script>
+</body>
+</html>
