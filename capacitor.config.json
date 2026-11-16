@@ -1,0 +1,9 @@
+{
+  "appId": "com.miguelenrique.micontrolempresarial",
+  "appName": "Mi Control Empresarial",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
