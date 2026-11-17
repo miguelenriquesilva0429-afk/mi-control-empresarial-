@@ -2215,7 +2215,377 @@ async function initialize(){
  clearSession();
  $("loginScreen").classList.remove("hidden-screen");
 }
+/* =========================================================
+   1. DESCARGA NATIVA EXCEL Y PDF (ANDROID + IPAD / IPHONE)
+   ========================================================= */
+async function saveUniversalFile(fileName, mimeType, base64Data, blobData) {
+  const Cap = window.Capacitor;
+  if (Cap && Cap.isNativePlatform && Cap.isNativePlatform()) {
+    try {
+      const { Filesystem, Share } = Cap.Plugins;
+      const saved = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: "CACHE"
+      });
+      await Share.share({
+        title: fileName,
+        url: saved.uri,
+        dialogTitle: "Guardar o compartir reporte"
+      });
+      return true;
+    } catch (err) {
+      alert("Error al exportar archivo: " + (err.message || err));
+      return true;
+    }
+  }
 
+  /* Soporte nativo para iPad / iPhone (PWA en pantalla de inicio) */
+  if (window.navigator.standalone && navigator.share && blobData) {
+    try {
+      const file = new File([blobData], fileName, { type: mimeType });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: fileName });
+        return true;
+      }
+    } catch (e) {
+      if (e.name === "AbortError") return true;
+    }
+  }
+  return false;
+}
+
+if (typeof XLSX !== "undefined") {
+  const _origXlsxWrite = XLSX.writeFile;
+  XLSX.writeFile = async function(wb, fileName, opts) {
+    const b64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+    const ab = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([ab], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const handled = await saveUniversalFile(fileName, blob.type, b64, blob);
+    if (!handled) return _origXlsxWrite.call(this, wb, fileName, opts);
+  };
+}
+
+if (window.jspdf?.jsPDF) {
+  const _origPdfSave = window.jspdf.jsPDF.prototype.save;
+  window.jspdf.jsPDF.prototype.save = async function(fileName, opts) {
+    const name = fileName || "reporte.pdf";
+    const dataUri = this.output("datauristring");
+    const b64 = dataUri.split(",").at(1);
+    const blob = this.output("blob");
+    const handled = await saveUniversalFile(name, "application/pdf", b64, blob);
+    if (!handled) return _origPdfSave.call(this, name, opts);
+  };
+}
+
+/* =========================================================
+   2. EDITAR Y ELIMINAR NEGOCIOS (ANDROID, IPAD Y IPHONE)
+   ========================================================= */
+(function setupBusinessManagement() {
+  const modalHtml = `
+    <div id="editBusinessModal" class="hidden-screen fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+      <div class="surface w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold">✏️ Editar Negocio</h3>
+          <button id="closeEditBizModalBtn" type="button" class="rounded-lg bg-slate-200 px-3 py-1 text-sm font-bold text-slate-700">✕</button>
+        </div>
+        <form id="editBusinessForm" class="space-y-4">
+          <input id="editBizId" type="hidden">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Nombre del negocio</label>
+            <input id="editBizName" required maxlength="80" class="w-full rounded-xl border border-slate-300 p-3">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Tipo / Rubro del negocio</label>
+            <input id="editBizType" required maxlength="60" placeholder="Ej. Granja, Comercio, Servicios" class="w-full rounded-xl border border-slate-300 p-3">
+          </div>
+          <p id="editBizStatus" class="text-sm"></p>
+          <div class="flex gap-3 pt-1">
+            <button type="button" id="cancelEditBizBtn" class="flex-1 rounded-xl bg-slate-200 p-3 font-semibold text-slate-800">Cancelar</button>
+            <button type="submit" id="saveEditBizBtn" class="flex-1 rounded-xl bg-sky-600 p-3 font-bold text-white">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+  const closeEditModal = () => $("editBusinessModal").classList.add("hidden-screen");
+  $("closeEditBizModalBtn").addEventListener("click", closeEditModal);
+  $("cancelEditBizBtn").addEventListener("click", closeEditModal);
+
+  $("editBusinessForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = $("saveEditBizBtn");
+    btn.disabled = true;
+    try {
+      const id = $("editBizId").value;
+      const newName = $("editBizName").value.trim();
+      const newType = $("editBizType").value.trim().toLocaleLowerCase("es");
+      if (!newName) throw new Error("Escribe un nombre válido.");
+
+      const user = await getCurrentUser();
+      await api(
+        "/rest/v1/accounts?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(user.id),
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ name: newName, account_type: newType })
+        }
+      );
+
+      const acc = state.accounts.find(a => a.id === id);
+      if (acc) {
+        acc.name = newName;
+        acc.account_type = newType;
+      }
+      if (typeof saveOfflineCache === "function") saveOfflineCache({ accounts: state.accounts });
+      renderAccountCards();
+      closeEditModal();
+    } catch (err) {
+      status("editBizStatus", err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  const _origRenderAccountCards = renderAccountCards;
+  renderAccountCards = function() {
+    _origRenderAccountCards();
+    const grid = $("businessGrid");
+    if (!grid) return;
+
+    const bizAccounts = state.accounts.filter(a => inferType(a) !== "personal");
+    const cards = Array.from(grid.children);
+
+    cards.forEach((card, idx) => {
+      const acc = bizAccounts[idx];
+      if (!acc || card.querySelector(".biz-actions-bar")) return;
+
+      const bar = document.createElement("div");
+      bar.className = "biz-actions-bar mt-4 pt-3 border-t border-slate-200/70 flex items-center justify-end gap-2";
+      bar.innerHTML = `
+        <button type="button" class="biz-edit-btn inline-flex items-center gap-1 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs font-bold text-sky-600 hover:bg-sky-500/25">
+          ✏️ Editar
+        </button>
+        <button type="button" class="biz-del-btn inline-flex items-center gap-1 rounded-lg bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-500/25">
+          🗑️ Eliminar
+        </button>
+      `;
+
+      bar.querySelector(".biz-edit-btn").addEventListener("click", e => {
+        e.stopPropagation();
+        $("editBizId").value = acc.id;
+        $("editBizName").value = acc.name || "";
+        $("editBizType").value = acc.account_type || "negocio";
+        $("editBizStatus").textContent = "";
+        $("editBusinessModal").classList.remove("hidden-screen");
+      });
+
+      bar.querySelector(".biz-del-btn").addEventListener("click", async e => {
+        e.stopPropagation();
+        const ok = confirm(`¿Seguro que deseas eliminar el negocio "${acc.name}"?\nSe borrarán también todos sus registros empresariales.`);
+        if (!ok) return;
+        try {
+          const user = await getCurrentUser();
+          await api(
+            "/rest/v1/accounts?id=eq." + encodeURIComponent(acc.id) + "&user_id=eq." + encodeURIComponent(user.id),
+            { method: "DELETE" }
+          );
+          state.accounts = state.accounts.filter(a => a.id !== acc.id);
+          if (typeof saveOfflineCache === "function") saveOfflineCache({ accounts: state.accounts });
+          renderAccountCards();
+        } catch (err) {
+          alert("No se pudo eliminar el negocio: " + err.message);
+        }
+      });
+
+      card.appendChild(bar);
+    });
+  };
+})();
+ /* =========================================================
+   3. SISTEMA INTELIGENTE DE INVENTARIO + DESCUENTO EN VENTAS
+   ========================================================= */
+(function setupSmartInventory() {
+  const LOW_STOCK_THRESHOLD = 5;
+
+  /* 1. Descuento automático al registrar una venta */
+  const _origApiInv = api;
+  api = async function(path, options = {}, retry = true) {
+    const res = await _origApiInv(path, options, retry);
+    const method = String(options.method || "GET").toUpperCase();
+
+    if (method === "POST" && path === "/rest/v1/business_records" && options.body) {
+      try {
+        const body = JSON.parse(options.body);
+        if (body.module === "ventas" && body.title && Number(body.quantity) > 0) {
+          const soldName = body.title.trim().toLowerCase();
+          const soldQty = Number(body.quantity);
+          const invItem = (state.entRecords || []).find(
+            r => r.module === "inventario" && r.title.trim().toLowerCase() === soldName
+          );
+
+          if (invItem) {
+            const oldQty = Number(invItem.quantity) || 0;
+            const newQty = Math.max(0, oldQty - soldQty);
+            const unitCost = oldQty > 0 ? (Number(invItem.amount) || 0) / oldQty : 0;
+            const newAmount = Number((newQty * unitCost).toFixed(2));
+            const user = await getCurrentUser();
+
+            await _origApiInv(
+              "/rest/v1/business_records?id=eq." + encodeURIComponent(invItem.id) +
+              "&user_id=eq." + encodeURIComponent(user.id),
+              {
+                method: "PATCH",
+                headers: { Prefer: "return=minimal" },
+                body: JSON.stringify({ quantity: newQty, amount: newAmount })
+              }
+            );
+
+            invItem.quantity = newQty;
+            invItem.amount = newAmount;
+
+            if (newQty === 0) {
+              alert(`🚨 ALERTA DE INVENTARIO:\nEl producto "${invItem.title}" se ha AGOTADO (0 en stock).`);
+            } else if (newQty <= LOW_STOCK_THRESHOLD) {
+              alert(`⚠️ STOCK BAJO:\nQuedan solo ${newQty} ${invItem.unit || "und"} de "${invItem.title}".`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Auto-descuento inventario:", e);
+      }
+    }
+    return res;
+  };
+
+  /* 2. Vista profesional con semáforo, alertas y botones +Reponer / -Ajustar */
+  const _origRenderEntWorkspace = renderEnterpriseWorkspace;
+  renderEnterpriseWorkspace = function() {
+    if (state.entModule !== "inventario") {
+      const oldBanner = $("invAlertBanner");
+      if (oldBanner) oldBanner.remove();
+      return _origRenderEntWorkspace();
+    }
+
+    const sumBox = $("entSummaryCards");
+    const tbody = $("entRecordsTable");
+    sumBox.innerHTML = "";
+    tbody.innerHTML = "";
+
+    const defaultCurr = String(state.entBusiness?.limit_currency || "USD").toUpperCase();
+    const rows = state.entRecords.filter(r => r.module === "inventario");
+
+    const totalCapital = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalUnits = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+    const lowOrOut = rows.filter(r => (Number(r.quantity) || 0) <= LOW_STOCK_THRESHOLD);
+
+    sumBox.innerHTML = `
+      <div class="rounded-2xl bg-sky-600 p-4 text-white shadow">
+        <p class="text-xs">Artículos / Existencias</p>
+        <p class="text-xl font-bold mt-1">${rows.length} prod. (${totalUnits} und)</p>
+      </div>
+      <div class="rounded-2xl bg-emerald-600 p-4 text-white shadow">
+        <p class="text-xs">Capital invertido en stock</p>
+        <p class="text-xl font-bold mt-1">${formatMoney(totalCapital, defaultCurr)}</p>
+      </div>
+      <div class="rounded-2xl ${lowOrOut.length ? "bg-rose-600" : "bg-slate-700"} p-4 text-white shadow">
+        <p class="text-xs">Alertas de reposición</p>
+        <p class="text-xl font-bold mt-1">${lowOrOut.length} por reponer</p>
+      </div>
+    `;
+
+    /* Banner superior si hay productos agotados o bajos */
+    let banner = $("invAlertBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "invAlertBanner";
+      sumBox.parentNode.insertBefore(banner, sumBox);
+    }
+    if (lowOrOut.length > 0) {
+      const names = lowOrOut.map(i => `${i.title} (${Number(i.quantity) || 0} ${i.unit || "und"})`).join(", ");
+      banner.className = "rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 text-sm font-semibold shadow-sm";
+      banner.innerHTML = `🚨 Atención de Inventario: Tienes ${lowOrOut.length} producto(s) agotados o con stock bajo → <span class="underline">${names}</span>`;
+    } else {
+      banner.className = "hidden-screen";
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted p-5 text-center">No hay productos registrados en el inventario todavía.</td></tr>`;
+      return;
+    }
+
+    rows.forEach(r => {
+      const qty = Number(r.quantity) || 0;
+      const amt = Number(r.amount) || 0;
+      const unitCost = qty > 0 ? amt / qty : 0;
+
+      let badgeHtml = `<span class="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-1 text-xs font-bold">🟢 Disponible</span>`;
+      let rowBg = "border-b border-slate-100";
+      if (qty === 0) {
+        badgeHtml = `<span class="rounded-full bg-rose-100 text-rose-800 px-2.5 py-1 text-xs font-bold">🔴 Agotado</span>`;
+        rowBg = "border-b border-rose-200 bg-rose-50/40";
+      } else if (qty <= LOW_STOCK_THRESHOLD) {
+        badgeHtml = `<span class="rounded-full bg-amber-100 text-amber-800 px-2.5 py-1 text-xs font-bold">🟡 Stock bajo</span>`;
+        rowBg = "border-b border-amber-200 bg-amber-50/30";
+      }
+
+      const tr = document.createElement("tr");
+      tr.className = rowBg;
+      tr.innerHTML = `
+        <td class="p-3 whitespace-nowrap">${r.record_date || "—"}</td>
+        <td class="p-3 font-bold">${r.title}<div class="muted text-xs font-normal">Costo unit.: ${formatMoney(unitCost, r.currency || defaultCurr)}</div></td>
+        <td class="p-3">${[r.party, r.category].filter(Boolean).join(" · ") || "—"}</td>
+        <td class="p-3 text-right font-extrabold text-base">${qty} <span class="text-xs font-normal">${r.unit || "und"}</span></td>
+        <td class="p-3 text-right font-bold">${formatMoney(amt, r.currency || defaultCurr)}</td>
+        <td class="p-3">${badgeHtml}</td>
+        <td class="p-3 whitespace-nowrap space-x-2">
+          <button type="button" class="rounded-lg bg-emerald-600/15 px-2.5 py-1 text-xs font-bold text-emerald-700" data-restock="${r.id}">+ Reponer</button>
+          <button type="button" class="rounded-lg bg-amber-600/15 px-2.5 py-1 text-xs font-bold text-amber-700" data-adjust="${r.id}">- Restar</button>
+          <button type="button" class="text-red-600 text-xs font-bold" data-del="${r.id}">Eliminar</button>
+        </td>
+      `;
+
+      tr.querySelector("[data-restock]")?.addEventListener("click", () => adjustInventoryStock(r, 1));
+      tr.querySelector("[data-adjust]")?.addEventListener("click", () => adjustInventoryStock(r, -1));
+      tr.querySelector("[data-del]")?.addEventListener("click", () => deleteEnterpriseRecord(r));
+      tbody.appendChild(tr);
+    });
+  };
+
+  async function adjustInventoryStock(item, direction) {
+    const label = direction > 0 ? `¿Cuántas unidades deseas SUMAR (reponer) a "${item.title}"?` : `¿Cuántas unidades deseas RESTAR (salida/merma) de "${item.title}"?`;
+    const input = prompt(label, "1");
+    if (input === null) return;
+    const delta = Number(input);
+    if (!Number.isFinite(delta) || delta <= 0) {
+      alert("Introduce una cantidad válida mayor a 0.");
+      return;
+    }
+
+    const oldQty = Number(item.quantity) || 0;
+    const newQty = direction > 0 ? oldQty + delta : Math.max(0, oldQty - delta);
+    const unitCost = oldQty > 0 ? (Number(item.amount) || 0) / oldQty : 0;
+    const newAmount = Number((newQty * unitCost).toFixed(2));
+
+    try {
+      const user = await getCurrentUser();
+      await api(
+        "/rest/v1/business_records?id=eq." + encodeURIComponent(item.id) +
+        "&user_id=eq." + encodeURIComponent(user.id),
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ quantity: newQty, amount: newAmount })
+        }
+      );
+      await loadEnterpriseRecords();
+    } catch (err) {
+      alert("Error al actualizar stock: " + err.message);
+    }
+  }
+})();
 initialize();
 </script>
  <script>
